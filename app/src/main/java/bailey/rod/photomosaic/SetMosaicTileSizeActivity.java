@@ -10,6 +10,7 @@ import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.util.AttributeSet;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 
 import java.io.IOException;
@@ -54,8 +55,13 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
         ImageView tileSizeImageView = (ImageView) findViewById(R.id.tile_size_image_view);
 
+
         Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
+
+            Button button = (Button) findViewById(R.id.tile_size_button);
+            button.setOnClickListener(new SendToServiceOnClickListener(imageUri));
+
             try {
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
                 Timber.i("bitmap=" + bitmap);
@@ -63,12 +69,28 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
                     Timber.i("bitmap.height=%d, bitmpa.width=%d", bitmap.getHeight(), bitmap.getWidth());
                     tileSizeImageView.setImageBitmap(bitmap);
                 }
-            }
-            catch (IOException iox) {
+            } catch (IOException iox) {
                 Timber.e(iox, "Failed to get raw image to be mosaiced");
             }
         }
     }
 
 
+    private class SendToServiceOnClickListener implements View.OnClickListener {
+
+        private final Uri imageUri;
+
+        public SendToServiceOnClickListener(Uri imageUri) {
+            this.imageUri = imageUri;
+        }
+
+        @Override
+        public void onClick(View view) {
+            Timber.i("About to trigger the PhotoMosaicService");
+
+            Intent serviceIntent = new Intent(SetMosaicTileSizeActivity.this, PhotoMosaicService.class);
+            serviceIntent.setData(imageUri);
+            SetMosaicTileSizeActivity.this.startService(serviceIntent);
+        }
+    }
 }

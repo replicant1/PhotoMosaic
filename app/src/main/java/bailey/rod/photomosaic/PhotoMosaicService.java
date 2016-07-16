@@ -5,6 +5,7 @@ import android.app.IntentService;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Environment;
@@ -15,6 +16,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStreamReader;
 
 import hugo.weaving.DebugLog;
@@ -52,6 +54,9 @@ public class PhotoMosaicService extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         i("dataString = " + intent.getDataString());
+        Uri imageUri = Uri.parse(intent.getDataString());
+
+        /*
         i("data directory = " + Environment.getDataDirectory()); // "/data"
         i("external storage directory = " + Environment.getExternalStorageDirectory()); // "/storage/emulated/0"
         i("DIRECTORY_PICTURES = " + Environment.DIRECTORY_PICTURES); // "Pictures"
@@ -82,5 +87,15 @@ public class PhotoMosaicService extends IntentService {
         }
 
         cursor.close();
+        */
+
+        try {
+            // TODO: Maybe do something more efficient based on loading some attributes of image?
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+            
+        }
+        catch (IOException iox) {
+            Timber.i(iox, "Failed to get bitmap for processing");
+        }
     }
 }

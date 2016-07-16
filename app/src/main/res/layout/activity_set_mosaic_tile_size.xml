@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:orientation="vertical"
-              android:background="#335585"
+              android:background="@color/Beige"
               android:layout_width="match_parent"
               android:layout_height="match_parent">
 
@@ -11,14 +11,14 @@
         android:id="@+id/tile_size_image_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#1144ee"
+        android:background="@color/Gray"
         android:layout_weight="1"/>
 
     <!-- Slider bar for setting mosaic tile size -->
 
-    <SeekBar
-        android:id="@+id/tile_size_seek_bar"
-        android:background="#dd11cd"
+    <Button
+        android:id="@+id/tile_size_button"
+        android:text="Send to PhotoMosaicService"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
