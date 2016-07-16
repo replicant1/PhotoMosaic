@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:background="#335585"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+
+    <!-- Image to be mosaic'd, with tiles overlayed -->
+
+    <ImageView
+        android:id="@+id/tile_size_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#1144ee"
+        android:layout_weight="1"/>
+
+    <!-- Slider bar for setting mosaic tile size -->
+
+    <SeekBar
+        android:id="@+id/tile_size_seek_bar"
+        android:background="#dd11cd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>
