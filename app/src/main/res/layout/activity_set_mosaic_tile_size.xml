@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:orientation="vertical"
-              android:background="@color/Beige"
+              android:background="@color/Black"
               android:layout_width="match_parent"
               android:layout_height="match_parent">
 
     <!-- Image to be mosaic'd, with tiles overlayed -->
 
     <ImageView
-        android:id="@+id/tile_size_image_view"
+        android:id="@+id/mosaic_image_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/Gray"
         android:layout_weight="1"/>
 
     <!-- Progress bar -->
@@ -25,13 +24,14 @@
     <TextView
         android:id="@+id/mosaic_progress_msg"
         android:textAlignment="center"
+        android:textColor="@color/White"
         android:textSize="14sp"
         android:layout_width="match_parent"
         android:layout_height="20dp"/>
 
     <Button
-        android:id="@+id/tile_size_button"
-        android:text="Send to PhotoMosaicService"
+        android:id="@+id/mosaic_start_button"
+        android:text="Start Mosaic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 

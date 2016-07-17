@@ -2,11 +2,14 @@ package bailey.rod.photomosaic;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
@@ -16,12 +19,17 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import timber.log.Timber;
 
 /**
- * Presents the image to be mosaic'd with a slider for adjusting the tile size of the mosaic.
+ * Presents the image to be mosaic'd with a slider for adjusting the tile size of the mosaic, a
+ * progress bar for tracking the progress of the mosaic processing process (which can be length),
+ * and a Canel button if the process is too long.
  */
 public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
@@ -32,6 +40,8 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
     private TextView mosaicProgressMsg;
 
     private ProgressBar progressBar;
+
+    private ImageView tileSizeImageView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -57,21 +67,23 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_set_mosaic_tile_size);
 
-        ImageView tileSizeImageView = (ImageView) findViewById(R.id.tile_size_image_view);
+        tileSizeImageView = (ImageView) findViewById(R.id.mosaic_image_view);
         progressBar = (ProgressBar) findViewById(R.id.mosaic_progress_bar);
         mosaicProgressMsg = (TextView) findViewById(R.id.mosaic_progress_msg);
 
         Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
 
-            Button button = (Button) findViewById(R.id.tile_size_button);
+            Button button = (Button) findViewById(R.id.mosaic_start_button);
             button.setOnClickListener(new SendToServiceOnClickListener(imageUri));
 
             try {
+                // TODO Load a scaled-down version of the image instead of the full size image
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+                //Bitmap bitmap  = loadBitmapFromStorage();
                 Timber.i("bitmap=" + bitmap);
                 if (bitmap != null) {
-                    Timber.i("bitmap.height=%d, bitmpa.width=%d", bitmap.getHeight(), bitmap.getWidth());
+                    Timber.i("bitmap.height=%d, bitmap.width=%d", bitmap.getHeight(), bitmap.getWidth());
                     tileSizeImageView.setImageBitmap(bitmap);
                 }
             } catch (IOException iox) {
@@ -106,12 +118,46 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
             // Update progress bar from data in the intent
             int percentComplete = intent.getIntExtra(PhotoMosaicService.EXTRA_PROGRESS, 0);
 
-            Timber.d("Into onReceive with percentComplete=%d", percentComplete);
+//            Timber.d("Into onReceive with percent=%d", percentComplete);
 
             progressBar.setProgress(percentComplete);
             mosaicProgressMsg.setText(String.format("Percent complete: %d", percentComplete));
 
+            if (percentComplete == 100) {
+                Timber.i("***** Percent is 100 ******");
+                tileSizeImageView.setImageBitmap(loadBitmapFromStorage());
+                tileSizeImageView.invalidate();
+            }
+
         }
+    }
+
+    private File getWorkingFilePath() {
+        ContextWrapper cw = new ContextWrapper(getApplicationContext());
+        File directory = cw.getExternalFilesDir(Environment.DIRECTORY_PICTURES); //cw.getFilesDir();
+        File path = new File(directory, "mosaic.jpg");
+        return path;
+    }
+
+    /**
+     * @return Mutable bitmap copy of the 'working file' that contains that mosaic currently under construction
+     */
+    private Bitmap loadBitmapFromStorage() {
+        Bitmap result = null;
+        File path = getWorkingFilePath();
+
+        Timber.d("------------------------------------------");
+        Timber.d("Loading bitmap from " + path.getAbsolutePath());
+
+        try {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inMutable = true;
+            result = BitmapFactory.decodeStream(new FileInputStream(path), null, options);
+        } catch (FileNotFoundException fnfe) {
+            Timber.e(fnfe, "Failed to load working file");
+        }
+
+        return result;
     }
 
     /**

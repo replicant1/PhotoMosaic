@@ -13,6 +13,7 @@
 
         <!--
         Welcome screen. Informs user what this app is for.
+        TODO: Remove this - not necessary.
         -->
         <activity
             android:name="bailey.rod.photomosaic.MainActivity"
