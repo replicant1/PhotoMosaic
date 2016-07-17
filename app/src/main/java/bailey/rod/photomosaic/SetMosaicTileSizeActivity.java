@@ -125,6 +125,11 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
             if (percentComplete == 100) {
                 Timber.i("***** Percent is 100 ******");
+                // TODO: This always fails and gives a blank ImageView. On the console there appears
+                // TODO "Skia: --- decode->decode returned false
+                // TODO TRY calling BitmapFactory.decode() directory on the returned bitmap to see
+                // TODO if I can get more specifics on the problem.
+                // TODO COuld be simultaneous access between Service and this Activity
                 tileSizeImageView.setImageBitmap(loadBitmapFromStorage());
                 tileSizeImageView.invalidate();
             }

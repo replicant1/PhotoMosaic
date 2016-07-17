@@ -206,6 +206,8 @@ public class PhotoMosaicService extends IntentService {
                              averageGreen,
                              averageBlue);
 
+                    saveBitmapToStorage(bitmap);
+
 
                     Intent broadcastIntent = new Intent(BROADCAST_ACTION);
                     broadcastIntent.putExtra(EXTRA_PROGRESS, percentProgress);
@@ -217,7 +219,7 @@ public class PhotoMosaicService extends IntentService {
             // Now write the modified bitmap (with red tile at top left) as a new image
             // back to the Media Store using the MediaScanner.
             //mediaScan();
-            saveBitmapToStorage(bitmap);
+            //saveBitmapToStorage(bitmap);
 
 
         } catch (IOException iox) {
