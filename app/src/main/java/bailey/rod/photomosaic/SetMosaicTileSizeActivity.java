@@ -1,21 +1,23 @@
 package bailey.rod.photomosaic;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.PersistableBundle;
 import android.provider.MediaStore;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
-import android.util.AttributeSet;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import java.io.IOException;
 
-import hugo.weaving.DebugLog;
 import timber.log.Timber;
 
 /**
@@ -23,15 +25,17 @@ import timber.log.Timber;
  */
 public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
+    private final IntentFilter intentFilter = new IntentFilter(PhotoMosaicService.BROADCAST_ACTION);
 
-    @DebugLog
+    private final MosaicBroadcastReceiver mosaicBroadcastReceiver = new MosaicBroadcastReceiver();
+
+    private TextView mosaicProgressMsg;
+
+    private ProgressBar progressBar;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        Timber.i("*****************************************");
-        Timber.i("**** Into SetMosaicTileSizeActivity  ****");
-        Timber.i("*****************************************");
 
         Intent intent = getIntent();
         String action = intent.getAction();
@@ -54,7 +58,8 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_set_mosaic_tile_size);
 
         ImageView tileSizeImageView = (ImageView) findViewById(R.id.tile_size_image_view);
-
+        progressBar = (ProgressBar) findViewById(R.id.mosaic_progress_bar);
+        mosaicProgressMsg = (TextView) findViewById(R.id.mosaic_progress_msg);
 
         Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
@@ -75,7 +80,45 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Timber.i("unregisetering receiver for PhotoMosaicService broadcasts");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicBroadcastReceiver);
+    }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Timber.i("Registering receiver for PhotoMossaicService broadcasts");
+        LocalBroadcastManager.getInstance(this).registerReceiver(mosaicBroadcastReceiver, intentFilter);
+    }
+
+    private class MosaicBroadcastReceiver extends BroadcastReceiver {
+
+        private MosaicBroadcastReceiver() {
+
+        }
+
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Update progress bar from data in the intent
+            int percentComplete = intent.getIntExtra(PhotoMosaicService.EXTRA_PROGRESS, 0);
+
+            Timber.d("Into onReceive with percentComplete=%d", percentComplete);
+
+            progressBar.setProgress(percentComplete);
+            mosaicProgressMsg.setText(String.format("Percent complete: %d", percentComplete));
+
+        }
+    }
+
+    /**
+     * Listens for a click on the "Send to PhotoMosaicService' button and sends an Intent
+     * off to start that service, which begins the process of creating the mosaic for the
+     * image in the media store that is currently displayed.
+     */
     private class SendToServiceOnClickListener implements View.OnClickListener {
 
         private final Uri imageUri;
@@ -86,7 +129,7 @@ public class SetMosaicTileSizeActivity extends AppCompatActivity {
 
         @Override
         public void onClick(View view) {
-            Timber.i("About to trigger the PhotoMosaicService");
+            Timber.i("About to start the PhotoMosaicService");
 
             Intent serviceIntent = new Intent(SetMosaicTileSizeActivity.this, PhotoMosaicService.class);
             serviceIntent.setData(imageUri);

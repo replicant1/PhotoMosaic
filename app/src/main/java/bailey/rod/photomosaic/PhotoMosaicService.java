@@ -11,6 +11,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.content.LocalBroadcastManager;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -29,7 +30,7 @@ import static timber.log.Timber.i;
 /**
  * A service that applies a "Mosaic" effect to a given image file. The image file is modified "in place" in an
  * asynchronous manner. The service broadcasts updates as it proceeds
- * <p>
+ * <p/>
  * To trigger the service, broadcast an Intent with the following data:
  * <ul>
  * <li> EXTERNAL_PATH_URI - Path to the raw image file to be mosaic'd. It should be somewhere where this service
@@ -44,6 +45,14 @@ import static timber.log.Timber.i;
  * <li> The tile's area in the phone is filled with image 'I'
  */
 public class PhotoMosaicService extends IntentService {
+
+    // Defines a custom Intent action
+    public static final String BROADCAST_ACTION =
+            "bailey.rod.photomosaic.BROADCAST";
+
+    // Defines the key for the status "extra" in an Intent
+    public static final String EXTRA_PROGRESS =
+            "bailey.rod.photomosaic.EXTRA_PROGRESS";
 
     @DebugLog
     public PhotoMosaicService() {
@@ -103,10 +112,20 @@ public class PhotoMosaicService extends IntentService {
             int alphaComponent;
             int pixelCount;
 
+            //LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+
+            int tileCountX = (int) Math.ceil((double) bitmap.getWidth() / 32D);
+            int tileCountY = (int) Math.ceil((double) bitmap.getHeight() / 32D);
+
+            int numTilesProcessed = 0;
+            int totalTilesToProcess = tileCountX * tileCountY;
+
+            Timber.d("tileCountX=%d, tileCountY=%d, total tiles=%d", tileCountX, tileCountY, totalTilesToProcess);
+
             for (int x = 0; x < bitmap.getWidth(); x += 32) {
                 for (int y = 0; y < bitmap.getHeight(); y += 32) {
 
-                    Timber.d("Processing tile [%d, %d]", x, y);
+                    //Timber.d("Processing tile [%d, %d]", x, y);
 
                     redComponent = 0;
                     blueComponent = 0;
@@ -135,9 +154,24 @@ public class PhotoMosaicService extends IntentService {
                     int averageGreen = greenComponent / pixelCount;
                     int averageAlpha = alphaComponent / pixelCount;
 
+                    numTilesProcessed++;
+
+                    // Contact the server to get a PNG of a tile with the average color
+
                     // Broadcast a new result - another tile has been averaged.
-                    Timber.d("Tile [%d, %d] has average color of (R:%d G:%d B:%d A:%d)", x, y, averageRed, averageGreen,
+                    // Include the tile just returned form the server in the content of the
+                    // broadcast message.
+                    int percentProgress = numTilesProcessed * 100 / totalTilesToProcess;
+                    Timber.d("Percent complete: %d, Tile [%d, %d] has average color of (R:%d G:%d B:%d A:%d)",
+                             percentProgress, x, y,
+                             averageRed,
+                             averageGreen,
                              averageBlue, averageAlpha);
+
+
+                    Intent broadcastIntent = new Intent(BROADCAST_ACTION);
+                    broadcastIntent.putExtra(EXTRA_PROGRESS, percentProgress);
+                    LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
                 } // for y
             } // for x
 
