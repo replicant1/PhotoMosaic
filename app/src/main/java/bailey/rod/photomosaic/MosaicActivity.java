@@ -35,13 +35,13 @@ import timber.log.Timber;
  */
 public class MosaicActivity extends AppCompatActivity {
 
-    private static final String WORKING_FILE_NAME = "mosaic.jpg";
-
     private final IntentFilter intentFilter = new IntentFilter(MosaicService.BROADCAST_ACTION);
 
     private final MosaicBroadcastReceiver mosaicBroadcastReceiver = new MosaicBroadcastReceiver();
 
     private Button allPurposeButton;
+
+    private Uri imageUri;
 
     private ImageView imageView;
 
@@ -73,12 +73,7 @@ public class MosaicActivity extends AppCompatActivity {
         }
     }
 
-    private File getWorkingFilePath() {
-        ContextWrapper cw = new ContextWrapper(getApplicationContext());
-        File directory = cw.getExternalFilesDir(Environment.DIRECTORY_PICTURES); //cw.getFilesDir() for internal;
-        File path = new File(directory, WORKING_FILE_NAME);
-        return path;
-    }
+
 
     /**
      * Initiaize the "Timber" logging utility so that debug log statements include a line number
@@ -96,26 +91,7 @@ public class MosaicActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * @return Mutable bitmap copy of the 'working file' that contains that mosaic currently under construction
-     */
-    private Bitmap loadBitmapFromStorage() {
-        Bitmap result = null;
-        File path = getWorkingFilePath();
 
-        Timber.d("------------------------------------------");
-        Timber.d("Loading bitmap from " + path.getAbsolutePath());
-
-        try {
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inMutable = true;
-            result = BitmapFactory.decodeStream(new FileInputStream(path), null, options);
-        } catch (FileNotFoundException fnfe) {
-            Timber.e(fnfe, "Failed to load working file");
-        }
-
-        return result;
-    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -151,7 +127,7 @@ public class MosaicActivity extends AppCompatActivity {
         mode = OperatingMode.READY_TO_START;
         adjustUIPerMode();
 
-        Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
 
             Button button = (Button) findViewById(R.id.mosaic_all_purpose_button);
@@ -159,8 +135,9 @@ public class MosaicActivity extends AppCompatActivity {
 
             try {
                 // TODO Load a scaled-down version of the image instead of the full size image
+
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-                //Bitmap bitmap  = loadBitmapFromStorage();
+                //Bitmap bitmap  = loadMutableBitmapFromScratchFile();
                 Timber.i("bitmap=" + bitmap);
                 if (bitmap != null) {
                     Timber.i("bitmap.height=%d, bitmap.width=%d", bitmap.getHeight(), bitmap.getWidth());
@@ -210,8 +187,8 @@ public class MosaicActivity extends AppCompatActivity {
                 Timber.i("***** Percent is 100 ******");
                 // TODO: What if I receive 100% notification multiple times?
                 // TODO: Probably need to alter MosaicService to send a distinct type of message upon finfish.
-                imageView.setImageBitmap(loadBitmapFromStorage());
-                imageView.invalidate(); // May not be necessary
+                MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
+                imageView.setImageBitmap(mosaicScratchFile.loadMutableBitmapFromScratchFile());
 
                 mode = OperatingMode.READY_TO_SEND_TO_MEDIA_STORE;
                 adjustUIPerMode();
