@@ -2,30 +2,23 @@ package bailey.rod.photomosaic;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import bailey.rod.photomosaic.log.ReleaseTree;
-import timber.log.Timber;
 
 /**
  * Presents the image to be mosaic'd with a allPurposeButton that takes you through to the next step in the mosaic'ing
@@ -34,6 +27,8 @@ import timber.log.Timber;
  * @see MosaicService
  */
 public class MosaicActivity extends AppCompatActivity {
+
+    private static final String TAG = MosaicActivity.class.getSimpleName();
 
     private final IntentFilter intentFilter = new IntentFilter(MosaicService.BROADCAST_ACTION);
 
@@ -73,49 +68,9 @@ public class MosaicActivity extends AppCompatActivity {
         }
     }
 
-
-
-    /**
-     * Initiaize the "Timber" logging utility so that debug log statements include a line number
-     */
-    private void initLogging() {
-        if (BuildConfig.DEBUG) {
-            Timber.plant(new Timber.DebugTree() {
-                @Override
-                protected String createStackElementTag(StackTraceElement element) {
-                    return super.createStackElementTag(element) + ":" + element.getLineNumber();
-                }
-            });
-        } else {
-            Timber.plant(new ReleaseTree());
-        }
-    }
-
-
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        initLogging();
-
-        Intent intent = getIntent();
-        String action = intent.getAction();
-        String type = intent.getType();
-
-        Bundle extras = intent.getExtras();
-        Timber.i("extras.contents=" + extras.describeContents());
-
-
-        for (String key : extras.keySet()) {
-            Timber.i("extras key=" + key);
-            Object value = extras.get(key);
-            if (value != null)
-                Timber.i("extras value.class = " + value.getClass());
-
-        }
-
-        Timber.i("intent=%s, action=%s, type=%s", intent, action, type);
 
         setContentView(R.layout.activity_mosaic);
 
@@ -127,7 +82,7 @@ public class MosaicActivity extends AppCompatActivity {
         mode = OperatingMode.READY_TO_START;
         adjustUIPerMode();
 
-        imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        imageUri = (Uri) getIntent().getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
 
             Button button = (Button) findViewById(R.id.mosaic_all_purpose_button);
@@ -135,16 +90,13 @@ public class MosaicActivity extends AppCompatActivity {
 
             try {
                 // TODO Load a scaled-down version of the image instead of the full size image
-
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-                //Bitmap bitmap  = loadMutableBitmapFromScratchFile();
-                Timber.i("bitmap=" + bitmap);
+
                 if (bitmap != null) {
-                    Timber.i("bitmap.height=%d, bitmap.width=%d", bitmap.getHeight(), bitmap.getWidth());
                     imageView.setImageBitmap(bitmap);
                 }
             } catch (IOException iox) {
-                Timber.e(iox, "Failed to get raw image to be mosaiced");
+                Log.e(TAG, "Failed to get raw image to be mosaiced", iox);
             }
         }
     }
@@ -184,7 +136,7 @@ public class MosaicActivity extends AppCompatActivity {
             progressMsg.setText(String.format("Percent complete: %d", percentComplete));
 
             if (percentComplete == 100) {
-                Timber.i("***** Percent is 100 ******");
+                Log.i(TAG, "***** Percent is 100 ******");
                 // TODO: What if I receive 100% notification multiple times?
                 // TODO: Probably need to alter MosaicService to send a distinct type of message upon finfish.
                 MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
@@ -234,8 +186,6 @@ public class MosaicActivity extends AppCompatActivity {
         }
 
         private void startMosaicService() {
-            Timber.i("About to start the MosaicService");
-
             Intent serviceIntent = new Intent(MosaicActivity.this, MosaicService.class);
             serviceIntent.setData(imageUri);
             MosaicActivity.this.startService(serviceIntent);
