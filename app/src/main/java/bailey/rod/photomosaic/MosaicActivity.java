@@ -17,6 +17,7 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import java.io.File;
 import java.io.IOException;
 
 
@@ -178,7 +179,9 @@ public class MosaicActivity extends AppCompatActivity {
                     break;
 
                 case READY_TO_SEND_TO_MEDIA_STORE:
-                    // TODO Raise bottom sheet with "send to" options
+                    MosaicScratchFile scratchFile = new MosaicScratchFile(MosaicActivity.this);
+                    File publicCopyOfScratchFile = scratchFile.copyScratchFileToPublicDirectory();
+                    scratchFile.addScratchFileToAndroidMediaStore(publicCopyOfScratchFile);
                     break;
             }
 

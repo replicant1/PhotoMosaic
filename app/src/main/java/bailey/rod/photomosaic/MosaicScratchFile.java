@@ -8,13 +8,18 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.text.format.DateFormat;
 import android.util.Log;
+
+import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.util.Date;
 
 /**
  * A local copy of the mosaic under construction. When the app starts, this file is initialized to be a
@@ -41,7 +46,6 @@ public class MosaicScratchFile {
     /**
      * Constructs a MosaicScrachFile suitable for use as a working file for creating a mosaic.
      *
-     * @param imageUri URI into the Android Media Store for the image of which we are to make a mosaic.
      * @param context  Application context.
      */
     public MosaicScratchFile(Context context) {
@@ -105,30 +109,32 @@ public class MosaicScratchFile {
      * Adds the current scratch file to the Android Media Store, where it can be seen by other apps.
      * TODO: Is there some way to get back the Uri of the newly added image?
      */
-    public void addToAndroidMediaStore() {
-        MediaScannerConnection.MediaScannerConnectionClient mediaScannerClient = new MediaScannerConnection.MediaScannerConnectionClient() {
-            private MediaScannerConnection msc = null;
+    public void addScratchFileToAndroidMediaStore(File imageFileToAdd) {
+        MediaScannerConnection.MediaScannerConnectionClient client =
+                new MosaicMediaScannerConnectionClient(imageFileToAdd);
+    }
 
-            {
-                msc = new MediaScannerConnection(context, this);
-                msc.connect();
-            }
+    public File copyScratchFileToPublicDirectory() {
+        File externalDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
 
-            @Override
-            public void onMediaScannerConnected() {
-                String mimeType = null;
-                String filePath = scratchFile.getAbsolutePath();
+        Log.d(TAG, "externalDir=" + externalDir);
 
-                Log.d(TAG, "Scanning file at " + filePath);
-                msc.scanFile(filePath, mimeType);
-            }
+        // Randomly generate a filename using the current date/time/seconds to guarantee uniqueness.
+        DateFormat dateFormat = new DateFormat();
+        CharSequence fileName = "mosaic_" + dateFormat.format("yyyy_MM_dd_hh_mm_ss", new Date()) + ".jpg";
+        File externalFile = new File(externalDir, (String) fileName);
 
-            @Override
-            public void onScanCompleted(String s, Uri uri) {
-                msc.disconnect();
-                Log.d(TAG, "Mosaic file added from: " + uri);
-            }
-        };
+        Log.d(TAG, "scratchFile=" + scratchFile.getAbsolutePath());
+        Log.d(TAG, "externalFile=" + externalFile.getAbsolutePath());
+
+        try {
+            FileUtils.copyFile(scratchFile, externalFile);
+            Log.i(TAG, String.format("Copied scratch file to %s OK", scratchFile.getAbsolutePath()));
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to copy scratch file to public", iox);
+        }
+
+        return externalFile;
     }
 
     /**
@@ -150,6 +156,33 @@ public class MosaicScratchFile {
             } catch (Exception e) {
                 Log.e(TAG, "Failed to close output stream when saving bitmap to scratch file", e);
             }
+        }
+    }
+
+    private class MosaicMediaScannerConnectionClient implements MediaScannerConnection.MediaScannerConnectionClient {
+        private final MediaScannerConnection msc;
+        private final File imageFileToAdd;
+
+        public MosaicMediaScannerConnectionClient(File imageFileToAdd) {
+            this.imageFileToAdd = imageFileToAdd;
+            msc = new MediaScannerConnection(context, this);
+            msc.connect();
+        }
+
+        @Override
+        public void onMediaScannerConnected() {
+            String mimeType = null;
+            String filePath = imageFileToAdd.getAbsolutePath();
+            Log.d(TAG, "Scanning file at " + filePath);
+            msc.scanFile(filePath, mimeType);
+        }
+
+        @Override
+        public void onScanCompleted(String s, Uri uri) {
+            msc.disconnect();
+            Log.d(TAG, "Notified of scan completion");
+            Log.d(TAG, "URI in Media Store: " + uri);
+            Log.d(TAG, "Path of file referenced by Media Store: " + s);
         }
     }
 }
