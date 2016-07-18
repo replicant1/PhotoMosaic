@@ -41,7 +41,7 @@ import static timber.log.Timber.i;
  * <li> An external service is contacted that takes the calculated average and returns a tile image 'I'
  * <li> The tile's area in the phone is filled with image 'I'
  */
-public class PhotoMosaicService extends IntentService {
+public class MosaicService extends IntentService {
 
     // Defines a custom Intent action
     public static final String BROADCAST_ACTION =
@@ -52,9 +52,9 @@ public class PhotoMosaicService extends IntentService {
             "bailey.rod.photomosaic.EXTRA_PROGRESS";
 
     @DebugLog
-    public PhotoMosaicService() {
+    public MosaicService() {
         super("Photo Mosaic");
-        i("PhotoMosaicService has been constructed");
+        i("MosaicService has been constructed");
     }
 
     private File getWorkingFilePath() {
@@ -218,7 +218,7 @@ public class PhotoMosaicService extends IntentService {
 
             // Now write the modified bitmap (with red tile at top left) as a new image
             // back to the Media Store using the MediaScanner.
-            //mediaScan();
+            //mediaScan();f
             //saveBitmapToStorage(bitmap);
 
 
@@ -232,7 +232,7 @@ public class PhotoMosaicService extends IntentService {
             private MediaScannerConnection msc = null;
 
             {
-                msc = new MediaScannerConnection(PhotoMosaicService.this, this);
+                msc = new MediaScannerConnection(MosaicService.this, this);
                 msc.connect();
             }
 

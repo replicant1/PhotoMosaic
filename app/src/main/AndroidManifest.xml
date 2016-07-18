@@ -2,18 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="bailey.rod.photomosaic">
 
+    <!-- In case the image supplied to mosaic is on external storage -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
         <!--
         Welcome screen. Informs user what this app is for.
-        TODO: Remove this - not necessary.
+        TODO: Can this be removed? Can intent filters be merged to .MosaicActivity?
         -->
         <activity
             android:name="bailey.rod.photomosaic.MainActivity"
@@ -27,12 +27,17 @@
         </activity>
 
         <!--
-        Activity for setting up tile size. "Send To" / "Share To" intents
-        from the Android Gallery app hook into this activity.
+        Activity for genearting a mosaic'd equivalent of a given image. "Share To" intents
+        from other app hook into this activity. This is
+        important because this is the way that mosaic'ing will generally be achieved. From some
+        other app (such as "Camera" or "File Explorer"), the user will select an image
+        then hit a "Share to" button. A list of apps to Share with will appear, one of which
+        will be this app. Selecting this app will fire up the MosaicActivity, which will later
+        fire up the MosaicService when it is ready to create a Mosaic.
         -->
 
         <activity
-            android:name="bailey.rod.photomosaic.SetMosaicTileSizeActivity"
+            android:name=".MosaicActivity"
             android:label="@string/app_name"
             android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
@@ -43,10 +48,10 @@
         </activity>
 
         <!--
-        Because 'exported' is true, this service can be invoked by any application
+        Because 'exported' is true, this service can be invoked by any application.
         -->
         <service
-            android:name="bailey.rod.photomosaic.PhotoMosaicService"
+            android:name=".MosaicService"
             android:exported="true">
 
         </service>
