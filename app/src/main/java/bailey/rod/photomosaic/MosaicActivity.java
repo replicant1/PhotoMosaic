@@ -7,6 +7,7 @@ import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
@@ -16,6 +17,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,7 +66,7 @@ public class MosaicActivity extends AppCompatActivity {
             case READY_TO_SEND_TO_MEDIA_STORE:
                 progressBar.setVisibility(View.INVISIBLE);
                 progressMsg.setVisibility(View.INVISIBLE);
-                allPurposeButton.setText("Send To");
+                allPurposeButton.setText("Open Mosaic");
                 break;
         }
     }
@@ -181,7 +183,26 @@ public class MosaicActivity extends AppCompatActivity {
                 case READY_TO_SEND_TO_MEDIA_STORE:
                     MosaicScratchFile scratchFile = new MosaicScratchFile(MosaicActivity.this);
                     File publicCopyOfScratchFile = scratchFile.copyScratchFileToPublicDirectory();
-                    scratchFile.addScratchFileToAndroidMediaStore(publicCopyOfScratchFile);
+                    scratchFile.addScratchFileToAndroidMediaStore(publicCopyOfScratchFile, new IAddedToMediaStore() {
+
+                        @Override
+                        public void added(final String pathToUnderlyingImageFile, final Uri mediaStoreUri) {
+                            Handler h = new Handler(MosaicActivity.this.getMainLooper());
+                            Runnable runnable = new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    Intent intent = new Intent();
+                                    intent.setAction(Intent.ACTION_VIEW);
+                                    intent.setDataAndType(mediaStoreUri, "image/*");
+                                    startActivity(intent);
+                                }
+                            };
+
+                            h.post(runnable);
+                        }
+                    });
+
                     break;
             }
 

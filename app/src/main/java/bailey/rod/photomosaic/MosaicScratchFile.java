@@ -2,6 +2,7 @@ package bailey.rod.photomosaic;
 
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaScannerConnection;
@@ -10,6 +11,7 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.apache.commons.io.FileUtils;
 
@@ -109,9 +111,9 @@ public class MosaicScratchFile {
      * Adds the current scratch file to the Android Media Store, where it can be seen by other apps.
      * TODO: Is there some way to get back the Uri of the newly added image?
      */
-    public void addScratchFileToAndroidMediaStore(File imageFileToAdd) {
+    public void addScratchFileToAndroidMediaStore(File imageFileToAdd, IAddedToMediaStore callback) {
         MediaScannerConnection.MediaScannerConnectionClient client =
-                new MosaicMediaScannerConnectionClient(imageFileToAdd);
+                new MosaicMediaScannerConnectionClient(imageFileToAdd, callback);
     }
 
     public File copyScratchFileToPublicDirectory() {
@@ -162,9 +164,11 @@ public class MosaicScratchFile {
     private class MosaicMediaScannerConnectionClient implements MediaScannerConnection.MediaScannerConnectionClient {
         private final MediaScannerConnection msc;
         private final File imageFileToAdd;
+        private final IAddedToMediaStore addedCallback;
 
-        public MosaicMediaScannerConnectionClient(File imageFileToAdd) {
+        public MosaicMediaScannerConnectionClient(File imageFileToAdd, IAddedToMediaStore addedCallback) {
             this.imageFileToAdd = imageFileToAdd;
+            this.addedCallback = addedCallback;
             msc = new MediaScannerConnection(context, this);
             msc.connect();
         }
@@ -177,12 +181,16 @@ public class MosaicScratchFile {
             msc.scanFile(filePath, mimeType);
         }
 
-        @Override
         public void onScanCompleted(String s, Uri uri) {
             msc.disconnect();
             Log.d(TAG, "Notified of scan completion");
             Log.d(TAG, "URI in Media Store: " + uri);
             Log.d(TAG, "Path of file referenced by Media Store: " + s);
+
+            addedCallback.added(s, uri);
+
+
+
         }
     }
 }
