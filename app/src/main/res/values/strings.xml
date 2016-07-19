@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">Photo Mosaic</string>
     <string name="action_settings">Settings</string>
-    <string name="button_label_start">Start Mosaic</string>
+    <string name="button_label_start">Start Making Mosaic</string>
     <string name="button_label_cancel">Cancel</string>
-    <string name="button_label_send_to">Open Mosaic</string>
+    <string name="button_label_send_to">Send Mosaic to Another App</string>
     <string name="progress_bar_percent_msg">Percent complete: %1$d</string>
 </resources>

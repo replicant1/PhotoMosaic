@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Binder;
+import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
@@ -33,11 +35,17 @@ import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
  */
 public class MosaicService extends IntentService {
 
-    private static final String TAG = MosaicService.class.getSimpleName();
-
     // Defines a custom Intent action for Intent broadcast every time the processing advances by another percent
     public static final String MOSAIC_CREATION_PROGRESSED =
             "bailey.rod.photomosaic.MOSAIC_CREATION_PROGRESSED";
+
+//    private class LocalBinder extends Binder {
+//        public MosaicService getService() {
+//            return MosaicService.this;
+//        }
+//    }
+//
+//    private final IBinder binder = new LocalBinder();
 
     // Custom Intent action broadcase whenever mosaic creation has finished and the completed mosaic
     // image is now in the private scratch file.
@@ -47,21 +55,14 @@ public class MosaicService extends IntentService {
     public static final String EXTRA_PROGRESS =
             "bailey.rod.photomosaic.EXTRA_PROGRESS";
 
+    private static final String TAG = MosaicService.class.getSimpleName();
+
+    public static volatile boolean abortRequested;
+
 
     public MosaicService() {
         super("Photo Mosaic");
         Log.i(TAG, "MosaicService has been constructed");
-    }
-
-
-    @Override
-    protected void onHandleIntent(Intent intent) {
-        Log.i(TAG, "dataString = " + intent.getDataString());
-
-        Uri imageUri = Uri.parse(intent.getDataString());
-        bigLoop(imageUri);
-
-        broadcastMosaicCreationFinished();
     }
 
     private void bigLoop(Uri imageUri) {
@@ -84,8 +85,8 @@ public class MosaicService extends IntentService {
         Log.d(TAG, String.format("tileCountX=%d, tileCountY=%d, total tiles=%d", tileCountX, tileCountY,
                                  totalTilesToProcess));
 
-        for (int tileLeftX = 0; tileLeftX < bitmap.getWidth(); tileLeftX += TILE_WIDTH_PX) {
-            for (int tileTopY = 0; tileTopY < bitmap.getHeight(); tileTopY += TILE_HEIGHT_PX) {
+        for (int tileLeftX = 0; (tileLeftX < bitmap.getWidth()) && !abortRequested; tileLeftX += TILE_WIDTH_PX) {
+            for (int tileTopY = 0; (tileTopY < bitmap.getHeight()) && !abortRequested; tileTopY += TILE_HEIGHT_PX) {
 
                 redComponent = 0;
                 blueComponent = 0;
@@ -142,15 +143,36 @@ public class MosaicService extends IntentService {
         } // for x
     }
 
+    private void broadcastMosaicCreationFinished() {
+        Intent broadcastIntent = new Intent(MOSAIC_CREATION_FINISHED);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
+    }
+
     private void broadcastProgressUpdate(int percentProgress) {
         Intent broadcastIntent = new Intent(MOSAIC_CREATION_PROGRESSED);
         broadcastIntent.putExtra(EXTRA_PROGRESS, percentProgress);
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
     }
 
-    private void broadcastMosaicCreationFinished() {
-        Intent broadcastIntent = new Intent(MOSAIC_CREATION_FINISHED);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
+    @Override
+    protected void onHandleIntent(Intent intent) {
+        Log.i(TAG, "intent = " + intent);
+        Log.i(TAG, "dataString = " + intent.getDataString());
+
+        abortRequested = false;
+
+        Uri imageUri = Uri.parse(intent.getDataString());
+        bigLoop(imageUri);
+
+        if (!abortRequested) {
+            broadcastMosaicCreationFinished();
+        }
+    }
+
+    @Override
+    public void onStart(Intent intent, int startId) {
+        super.onStart(intent, startId);
+        Log.i(TAG, "MosaicService is being started");
     }
 
 

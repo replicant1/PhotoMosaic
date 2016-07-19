@@ -87,19 +87,26 @@ public class MosaicActivity extends AppCompatActivity {
         progressMsg = (TextView) findViewById(R.id.mosaic_progress_msg);
         allPurposeButton = (Button) findViewById(R.id.mosaic_all_purpose_button);
 
+        imageUri = (Uri) getIntent().getParcelableExtra(Intent.EXTRA_STREAM);
+
+        if (imageUri != null) {
+            allPurposeButton.setOnClickListener(new AllPurposeButtonOnClickListener(imageUri));
+        }
+
+        switchToReadyToStartMode();
+    }
+
+    /**
+     * Resets the UI ready for the user to start the mosaic process. The image shown is the one whose URI was
+     * passed into the Intent that started this activity (if any).
+     */
+    private void switchToReadyToStartMode() {
         mode = OperatingMode.READY_TO_START;
         adjustUIPerMode();
 
-        imageUri = (Uri) getIntent().getParcelableExtra(Intent.EXTRA_STREAM);
         if (imageUri != null) {
-
-            Button button = (Button) findViewById(R.id.mosaic_all_purpose_button);
-            button.setOnClickListener(new AllPurposeButtonOnClickListener(imageUri));
-
             try {
-                // TODO Load a scaled-down version of the image instead of the full size image, to save memory
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-
                 if (bitmap != null) {
                     imageView.setImageBitmap(bitmap);
                 }
@@ -149,8 +156,6 @@ public class MosaicActivity extends AppCompatActivity {
             progressBar.setProgress(percentComplete);
             String progressBarMsgFormat = getResources().getString(R.string.progress_bar_percent_msg);
             progressMsg.setText(String.format(progressBarMsgFormat, percentComplete));
-
-
         }
     }
 
@@ -189,15 +194,23 @@ public class MosaicActivity extends AppCompatActivity {
         @Override
         public void onClick(View view) {
             switch (mode) {
+                // Button is labelled "Start" and user has just clicked it. Kick off mosaic processing.
                 case READY_TO_START:
                     mode = OperatingMode.PROCESSING;
                     startMosaicService();
                     break;
 
+                // Button is labelled "Cancel" and user has just clicked it. Cancel the mosaic service
+                // and rever to "Ready to Start" mode.
                 case PROCESSING:
-                    mode = OperatingMode.READY_TO_START;
+                    MosaicService.abortRequested = true;
+
+                    // Resets the scratch file to the original contents from the Media Store
+                    switchToReadyToStartMode();
                     break;
 
+                // Button is labelled "Send To", and mosaic processing has finished. User clicks button to elect
+                // to "Send to" some other. Scratch file contains completed mosaic.
                 case READY_TO_SEND_TO_MEDIA_STORE:
                     MosaicScratchFile scratchFile = new MosaicScratchFile(MosaicActivity.this);
                     File publicCopyOfScratchFile = scratchFile.copyScratchFileToPublicDirectory();
@@ -228,6 +241,7 @@ public class MosaicActivity extends AppCompatActivity {
         }
 
         private void startMosaicService() {
+            Log.i(TAG, "Into startMosaicService with imageUri=" + imageUri);
             Intent serviceIntent = new Intent(MosaicActivity.this, MosaicService.class);
             serviceIntent.setData(imageUri);
             MosaicActivity.this.startService(serviceIntent);
