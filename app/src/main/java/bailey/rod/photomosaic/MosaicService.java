@@ -17,11 +17,11 @@ import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
  * A service that applies a "Mosaic" effect to a given image file. The image file is specified with a
  * URI to the Android Media Store. The service broadcasts three types of Intents as it proceeds
  * through the mosaicing process - progress, finished and error.
- * <p/>
+ * <p>
  * To trigger the service, broadcast an Intent with the sole data of the URI to the image file
  * to be processed. From inside an Activity, do this:
  * <code>
- * <p/>
+ * <p>
  * Intent intent = new Intent(this, MosaicService.class);
  * intent.setData(imageUri);
  * startService(intent);
@@ -39,14 +39,6 @@ public class MosaicService extends IntentService {
     public static final String MOSAIC_CREATION_PROGRESSED =
             "bailey.rod.photomosaic.MOSAIC_CREATION_PROGRESSED";
 
-//    private class LocalBinder extends Binder {
-//        public MosaicService getService() {
-//            return MosaicService.this;
-//        }
-//    }
-//
-//    private final IBinder binder = new LocalBinder();
-
     // Custom Intent action broadcase whenever mosaic creation has finished and the completed mosaic
     // image is now in the private scratch file.
     public static final String MOSAIC_CREATION_FINISHED = "bailey.rod.photomosaic.MOSAIC_CREATION_FINISHED";
@@ -57,24 +49,35 @@ public class MosaicService extends IntentService {
 
     private static final String TAG = MosaicService.class.getSimpleName();
 
+    // A quick but dodgy way to bring this service to an immediate halt from an associated Activity.
+    // TODO Better way would be to use IBinder and bind service to activity in the usual manner
     public static volatile boolean abortRequested;
-
 
     public MosaicService() {
         super("Photo Mosaic");
         Log.i(TAG, "MosaicService has been constructed");
     }
 
+    /**
+     * @param imageUri URI in the Media Store of the image that is to be mosaic'd.
+     */
     private void bigLoop(Uri imageUri) {
+        // Initialize the scratch file with the raw image to be mosaic'd. Subsequent modifications are made to this
+        // private copy.
         MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(this);
         mosaicScratchFile.initFromMediaStore(imageUri);
         Bitmap bitmap = mosaicScratchFile.loadMutableBitmapFromScratchFile();
 
+        // Lots of declarations up front to avoid overhead of constant re-creation in the tight loop below
         int pixel;
         int redComponent;
         int blueComponent;
         int greenComponent;
         int numPixelsInTile;
+        int averageRed;
+        int averageBlue;
+        int averageGreen;
+        int averageColor;
 
         int tileCountX = (int) Math.ceil((double) bitmap.getWidth() / (double) TILE_WIDTH_PX);
         int tileCountY = (int) Math.ceil((double) bitmap.getHeight() / (double) TILE_HEIGHT_PX);
@@ -85,15 +88,19 @@ public class MosaicService extends IntentService {
         Log.d(TAG, String.format("tileCountX=%d, tileCountY=%d, total tiles=%d", tileCountX, tileCountY,
                                  totalTilesToProcess));
 
-        for (int tileLeftX = 0; (tileLeftX < bitmap.getWidth()) && !abortRequested; tileLeftX += TILE_WIDTH_PX) {
-            for (int tileTopY = 0; (tileTopY < bitmap.getHeight()) && !abortRequested; tileTopY += TILE_HEIGHT_PX) {
+        // Process mosaic tiles in row-major order i.e. same as western reading order.
+        for (int tileTopY = 0; (tileTopY < bitmap.getHeight()) && !abortRequested; tileTopY += TILE_HEIGHT_PX) {
+            for (int tileLeftX = 0; (tileLeftX < bitmap.getWidth()) && !abortRequested; tileLeftX += TILE_WIDTH_PX) {
 
+                // Find the average colour for the pixels in the tile by finding the average red, green and blue
+                // component values of each pixel individually.
                 redComponent = 0;
                 blueComponent = 0;
                 greenComponent = 0;
 
                 numPixelsInTile = 0;
 
+                // TODO: Investigate if bitmap.getpixels() is better than bitmap.getPixel() in a loop.
                 for (int pixelX = tileLeftX; (pixelX < (tileLeftX + TILE_WIDTH_PX)) && (pixelX < bitmap.getWidth());
                      pixelX++) {
                     for (int pixelY = tileTopY; (pixelY < (tileTopY + TILE_HEIGHT_PX)) && (pixelY < bitmap.getHeight());
@@ -110,12 +117,12 @@ public class MosaicService extends IntentService {
                     }
                 }
 
-                int averageRed = redComponent / numPixelsInTile;
-                int averageBlue = blueComponent / numPixelsInTile;
-                int averageGreen = greenComponent / numPixelsInTile;
-                int averageColor = Color.rgb(averageRed, averageGreen, averageBlue);
+                averageRed = redComponent / numPixelsInTile;
+                averageBlue = blueComponent / numPixelsInTile;
+                averageGreen = greenComponent / numPixelsInTile;
+                averageColor = Color.rgb(averageRed, averageGreen, averageBlue);
 
-                // Overdraw the tile with a blank area equal to its average color.
+                // Fill the tile with its average color.
                 for (int drawX = tileLeftX; (drawX < (tileLeftX + TILE_WIDTH_PX)) && (drawX < bitmap.getWidth()); drawX++) {
                     for (int drawY = tileTopY; (drawY < (tileTopY + TILE_HEIGHT_PX)) && (drawY < bitmap.getHeight());
                          drawY++) {
@@ -137,17 +144,31 @@ public class MosaicService extends IntentService {
                                          averageGreen,
                                          averageBlue));
 
+                // TODO: Maybe just save the tile we just changed, rather than the entire bitmap, most of which
+                // hasn't changed.
                 mosaicScratchFile.saveBitmapToScratchFile(bitmap);
                 broadcastProgressUpdate(percentProgress);
-            } // for y
-        } // for x
+
+
+                // TODO At end of row, broadcast MOSAIC_ROW_PROCESSED intent
+            } // for x
+        } // for y
     }
 
+    /**
+     * Broadcasts to MosaicActivity that this service has finished the mosaic creation process
+     */
     private void broadcastMosaicCreationFinished() {
         Intent broadcastIntent = new Intent(MOSAIC_CREATION_FINISHED);
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
     }
 
+    /**
+     * Broadcasts to MosaicActivity that this service has made further progress in creating the mosaic, by
+     * processing another tile.
+     *
+     * @param percentProgress The percentage progress in [0,100]
+     */
     private void broadcastProgressUpdate(int percentProgress) {
         Intent broadcastIntent = new Intent(MOSAIC_CREATION_PROGRESSED);
         broadcastIntent.putExtra(EXTRA_PROGRESS, percentProgress);
@@ -174,6 +195,4 @@ public class MosaicService extends IntentService {
         super.onStart(intent, startId);
         Log.i(TAG, "MosaicService is being started");
     }
-
-
 }
