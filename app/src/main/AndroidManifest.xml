@@ -13,23 +13,7 @@
         android:theme="@style/AppTheme">
 
         <!--
-        Welcome screen. Informs user what this app is for.
-        TODO: Can this be removed? Can intent filters be merged to .MosaicActivity?
-        -->
-        <activity
-            android:name="bailey.rod.photomosaic.MainActivity"
-            android:label="@string/app_name"
-            android:screenOrientation="portrait"
-            android:theme="@style/AppTheme.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-
-        <!--
-        Activity for genearting a mosaic'd equivalent of a given image. "Share To" intents
+        Activity for generating a mosaic'd equivalent of a given image. "Share To" intents
         from other app hook into this activity. This is
         important because this is the way that mosaic'ing will generally be achieved. From some
         other app (such as "Camera" or "File Explorer"), the user will select an image
@@ -41,8 +25,11 @@
         <activity
             android:name=".MosaicActivity"
             android:label="@string/app_name"
-            android:screenOrientation="portrait"
-            android:theme="@style/AppTheme.NoActionBar">
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>
                 <category android:name="android.intent.category.DEFAULT"/>

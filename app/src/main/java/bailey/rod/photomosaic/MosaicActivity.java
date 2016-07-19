@@ -54,23 +54,51 @@ public class MosaicActivity extends AppCompatActivity {
 
     private TextView progressMsg;
 
+    private TextView helpTextView;
+
+    /**
+     * Adjusts the visibility of UI components and the label on the all-purpose button
+     * to suit the current operating mode.
+     */
     private void adjustUIPerMode() {
         switch (mode) {
-            case READY_TO_START:
-                progressBar.setVisibility(View.INVISIBLE);
-                progressMsg.setVisibility(View.INVISIBLE);
+            // Only the help text is visible
+            case NO_IMAGE_TO_MOSAIC:
+                imageView.setVisibility(View.GONE);
+                helpTextView.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(View.GONE);
+                progressMsg.setVisibility(View.GONE);
+                allPurposeButton.setVisibility(View.GONE);
+                break;
+
+            // Only the image and the "Start" button are visible
+            case READY_TO_START_MOSAIC_PROCESSING:
+                helpTextView.setVisibility(View.GONE);
+                imageView.setVisibility(View.VISIBLE);
+                progressBar.setVisibility(View.GONE);
+                progressMsg.setVisibility(View.GONE);
+                allPurposeButton.setVisibility(View.VISIBLE);
                 allPurposeButton.setText(R.string.button_label_start);
                 break;
 
-            case PROCESSING:
+            // Visible: The image, progress bar, progress bar message and
+            // "Cancel" button.
+            case MOSAIC_PROCESSING_IN_PROGRESS:
+                helpTextView.setVisibility(View.GONE);
+                imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.VISIBLE);
                 progressMsg.setVisibility(View.VISIBLE);
+                allPurposeButton.setVisibility(View.VISIBLE);
                 allPurposeButton.setText(R.string.button_label_cancel);
                 break;
 
-            case READY_TO_SEND_TO_MEDIA_STORE:
+            // Only the image view and "Send" button are visible.
+            case MOSIAC_PROCESSING_COMPLETED:
+                helpTextView.setVisibility(View.GONE);
+                imageView.setVisibility(View.VISIBLE);
                 progressBar.setVisibility(View.INVISIBLE);
                 progressMsg.setVisibility(View.INVISIBLE);
+                allPurposeButton.setVisibility(View.VISIBLE);
                 allPurposeButton.setText(R.string.button_label_send_to);
                 break;
         }
@@ -86,14 +114,16 @@ public class MosaicActivity extends AppCompatActivity {
         progressBar = (ProgressBar) findViewById(R.id.mosaic_progress_bar);
         progressMsg = (TextView) findViewById(R.id.mosaic_progress_msg);
         allPurposeButton = (Button) findViewById(R.id.mosaic_all_purpose_button);
+        helpTextView = (TextView) findViewById(R.id.mosaic_help_text_view);
 
         imageUri = (Uri) getIntent().getParcelableExtra(Intent.EXTRA_STREAM);
 
-        if (imageUri != null) {
+        if (imageUri == null) {
+            switchToNoImageToMosaicMode();
+        } else {
             allPurposeButton.setOnClickListener(new AllPurposeButtonOnClickListener(imageUri));
+            switchToReadyToStartMode();
         }
-
-        switchToReadyToStartMode();
     }
 
     /**
@@ -101,7 +131,7 @@ public class MosaicActivity extends AppCompatActivity {
      * passed into the Intent that started this activity (if any).
      */
     private void switchToReadyToStartMode() {
-        mode = OperatingMode.READY_TO_START;
+        mode = OperatingMode.READY_TO_START_MOSAIC_PROCESSING;
         adjustUIPerMode();
 
         if (imageUri != null) {
@@ -114,6 +144,11 @@ public class MosaicActivity extends AppCompatActivity {
                 Log.e(TAG, "Failed to get raw image to be mosaiced", iox);
             }
         }
+    }
+
+    private void switchToNoImageToMosaicMode() {
+        mode = OperatingMode.NO_IMAGE_TO_MOSAIC;
+        adjustUIPerMode();
     }
 
     @Override
@@ -135,9 +170,10 @@ public class MosaicActivity extends AppCompatActivity {
      * up to in the process of creating the mosaic image.
      */
     public enum OperatingMode {
-        READY_TO_START, // Raw image displaying with "start" button available
-        PROCESSING, // Bailed out of processing, probably taking too long
-        READY_TO_SEND_TO_MEDIA_STORE; // Finished mosaic is displaying, now ready to send to Media Store
+        NO_IMAGE_TO_MOSAIC, // When app is started from Android app launcher without Intent specifying an image
+        READY_TO_START_MOSAIC_PROCESSING, // Raw image displaying with "start" button available
+        MOSAIC_PROCESSING_IN_PROGRESS, // Creation of the mosaic image in the scratch file is underway
+        MOSIAC_PROCESSING_COMPLETED; // Finished mosaic is displaying, now ready to send to Media Store
     }
 
     /**
@@ -169,7 +205,7 @@ public class MosaicActivity extends AppCompatActivity {
             MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
             imageView.setImageBitmap(mosaicScratchFile.loadMutableBitmapFromScratchFile());
 
-            mode = OperatingMode.READY_TO_SEND_TO_MEDIA_STORE;
+            mode = OperatingMode.MOSIAC_PROCESSING_COMPLETED;
             adjustUIPerMode();
         }
     }
@@ -195,14 +231,14 @@ public class MosaicActivity extends AppCompatActivity {
         public void onClick(View view) {
             switch (mode) {
                 // Button is labelled "Start" and user has just clicked it. Kick off mosaic processing.
-                case READY_TO_START:
-                    mode = OperatingMode.PROCESSING;
+                case READY_TO_START_MOSAIC_PROCESSING:
+                    mode = OperatingMode.MOSAIC_PROCESSING_IN_PROGRESS;
                     startMosaicService();
                     break;
 
                 // Button is labelled "Cancel" and user has just clicked it. Cancel the mosaic service
                 // and rever to "Ready to Start" mode.
-                case PROCESSING:
+                case MOSAIC_PROCESSING_IN_PROGRESS:
                     MosaicService.abortRequested = true;
 
                     // Resets the scratch file to the original contents from the Media Store
@@ -211,7 +247,7 @@ public class MosaicActivity extends AppCompatActivity {
 
                 // Button is labelled "Send To", and mosaic processing has finished. User clicks button to elect
                 // to "Send to" some other. Scratch file contains completed mosaic.
-                case READY_TO_SEND_TO_MEDIA_STORE:
+                case MOSIAC_PROCESSING_COMPLETED:
                     MosaicScratchFile scratchFile = new MosaicScratchFile(MosaicActivity.this);
                     File publicCopyOfScratchFile = scratchFile.copyScratchFileToPublicDirectory();
                     scratchFile.addScratchFileToAndroidMediaStore(publicCopyOfScratchFile, new IAddedToMediaStore() {

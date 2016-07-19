@@ -4,10 +4,30 @@ Layout for the MosaicActivity. Displays an image at top, button and (sometimes) 
 at the bottom
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              xmlns:tools="http://schemas.android.com/tools"
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:background="@color/Black"
-              android:orientation="vertical">
+              android:orientation="vertical"
+              android:padding="@dimen/mosaic_outer_margin">
+
+    <!--
+    Static piece of help text that displays in place of the mosaic_image_view
+    when this activity is started wihtout an Intent specifyig an image to be
+    mosaic'd.
+    -->
+
+    <TextView
+        android:id="@+id/mosaic_help_text_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:text="@string/help_text"
+        android:textAlignment="center"
+        android:gravity="center"
+        android:textColor="@color/White"
+        android:textSize="@dimen/help_text_size"/>
 
     <!-- Image to be mosaic'd. Refreshed after each row of tiles has been processsed. -->
 
@@ -15,6 +35,7 @@ at the bottom
         android:id="@+id/mosaic_image_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_margin="@dimen/mosaic_inner_margin"
         android:layout_weight="1"/>
 
     <!-- Progress bar - hidden until mosaic processing begins, when user presses "Start" button -->
@@ -24,7 +45,7 @@ at the bottom
         style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_width="match_parent"
         android:layout_height="14dp"
-        android:visibility="invisible"/>
+        android:layout_marginTop="@dimen/mosaic_inner_margin"/>
 
     <!-- Message under the progress bar - visibility is tied to mosaic_progress_bar -->
 
@@ -33,10 +54,10 @@ at the bottom
         android:layout_width="wrap_content"
         android:layout_height="20dp"
         android:layout_gravity="center"
+        android:layout_marginTop="@dimen/mosaic_inner_margin"
         android:textAlignment="center"
         android:textColor="@color/White"
-        android:textSize="14sp"
-        android:visibility="invisible"/>
+        android:textSize="@dimen/progress_message_text_size"/>
 
     <!--
     Button whose label cycles between "Start", "Cancel" and "Send", depending on
@@ -48,6 +69,6 @@ at the bottom
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        />
+        android:layout_marginTop="@dimen/mosaic_inner_margin"/>
 
 </LinearLayout>
