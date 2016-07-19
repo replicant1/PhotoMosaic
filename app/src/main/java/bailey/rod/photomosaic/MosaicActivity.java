@@ -54,19 +54,19 @@ public class MosaicActivity extends AppCompatActivity {
             case READY_TO_START:
                 progressBar.setVisibility(View.INVISIBLE);
                 progressMsg.setVisibility(View.INVISIBLE);
-                allPurposeButton.setText("Start Mosaic");
+                allPurposeButton.setText(R.string.button_label_start);
                 break;
 
             case PROCESSING:
                 progressBar.setVisibility(View.VISIBLE);
                 progressMsg.setVisibility(View.VISIBLE);
-                allPurposeButton.setText("Cancel");
+                allPurposeButton.setText(R.string.button_label_cancel);
                 break;
 
             case READY_TO_SEND_TO_MEDIA_STORE:
                 progressBar.setVisibility(View.INVISIBLE);
                 progressMsg.setVisibility(View.INVISIBLE);
-                allPurposeButton.setText("Open Mosaic");
+                allPurposeButton.setText(R.string.button_label_send_to);
                 break;
         }
     }
@@ -92,7 +92,7 @@ public class MosaicActivity extends AppCompatActivity {
             button.setOnClickListener(new AllPurposeButtonOnClickListener(imageUri));
 
             try {
-                // TODO Load a scaled-down version of the image instead of the full size image
+                // TODO Load a scaled-down version of the image instead of the full size image, to save memory
                 Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
 
                 if (bitmap != null) {
@@ -116,6 +116,10 @@ public class MosaicActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).registerReceiver(mosaicBroadcastReceiver, intentFilter);
     }
 
+    /**
+     * The mode in which this Activity is currently running. Like a state machine. Varies according to where we are
+     * up to in the process of creating the mosaic image.
+     */
     public enum OperatingMode {
         READY_TO_START, // Raw image displaying with "start" button available
         PROCESSING, // Bailed out of processing, probably taking too long
@@ -136,10 +140,10 @@ public class MosaicActivity extends AppCompatActivity {
             int percentComplete = intent.getIntExtra(MosaicService.EXTRA_PROGRESS, 0);
 
             progressBar.setProgress(percentComplete);
-            progressMsg.setText(String.format("Percent complete: %d", percentComplete));
+            String progressBarMsgFormat = getResources().getString(R.string.progress_bar_percent_msg);
+            progressMsg.setText(String.format(progressBarMsgFormat, percentComplete));
 
             if (percentComplete == 100) {
-                Log.i(TAG, "***** Percent is 100 ******");
                 // TODO: What if I receive 100% notification multiple times?
                 // TODO: Probably need to alter MosaicService to send a distinct type of message upon finfish.
                 MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);

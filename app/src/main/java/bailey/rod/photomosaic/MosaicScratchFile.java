@@ -2,7 +2,6 @@ package bailey.rod.photomosaic;
 
 import android.content.Context;
 import android.content.ContextWrapper;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaScannerConnection;
@@ -11,7 +10,6 @@ import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.format.DateFormat;
 import android.util.Log;
-import android.widget.Toast;
 
 import org.apache.commons.io.FileUtils;
 
@@ -20,8 +18,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.Date;
+
+import static bailey.rod.photomosaic.Constants.*;
 
 /**
  * A local copy of the mosaic under construction. When the app starts, this file is initialized to be a
@@ -35,9 +34,6 @@ public class MosaicScratchFile {
 
     // Logging tag
     private static final String TAG = MosaicScratchFile.class.getSimpleName();
-
-    // Simple file name of the scratch file
-    private static final String SCRATCH_FILE_NAME = "mosaic.jpg";
 
     // Actual path to the scratch file
     private final File scratchFile;
@@ -55,9 +51,44 @@ public class MosaicScratchFile {
         this.context = context;
     }
 
-    public void initFromMediaStore(Uri imageUri) {
-        Bitmap bitmap = loadBitmapFromMediaStore(imageUri, context);
-        saveBitmapToScratchFile(bitmap);
+    /**
+     * Adds the current scratch file to the Android Media Store, where it can be seen by other apps.
+     * TODO: Is there some way to get back the Uri of the newly added image?
+     */
+    public void addScratchFileToAndroidMediaStore(File imageFileToAdd, IAddedToMediaStore callback) {
+        MediaScannerConnection.MediaScannerConnectionClient client =
+                new MosaicMediaScannerConnectionClient(imageFileToAdd, callback);
+    }
+
+    /**
+     * Copies the scratch file frorm the app's private storage directory to a publicly visible "Pictures"
+     * directory. The public copy is the one that should be referenced by the Android Media Store (as the internasl
+     * scratch file will be over-written in the next mosaic operation).
+     *
+     * @return The location of the public copy of the scratch file.
+     */
+    public File copyScratchFileToPublicDirectory() {
+        File externalDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+
+        Log.d(TAG, "externalDir=" + externalDir);
+
+        // Randomly generate a filename using the current date/time/seconds to guarantee uniqueness.
+        DateFormat dateFormat = new DateFormat();
+        CharSequence fileName = OUTPUT_IMAGE_FILE_PREFIX + dateFormat.format(OUTPUT_IMAGE_FILE_INFIX, new Date()) +
+                OUTPUT_IMAGE_FILE_SUFFIX;
+        File externalFile = new File(externalDir, (String) fileName);
+
+        Log.d(TAG, "scratchFile=" + scratchFile.getAbsolutePath());
+        Log.d(TAG, "externalFile=" + externalFile.getAbsolutePath());
+
+        try {
+            FileUtils.copyFile(scratchFile, externalFile);
+            Log.i(TAG, String.format("Copied scratch file to %s OK", scratchFile.getAbsolutePath()));
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to copy scratch file to public", iox);
+        }
+
+        return externalFile;
     }
 
     /**
@@ -70,6 +101,16 @@ public class MosaicScratchFile {
         ContextWrapper cw = new ContextWrapper(context);
         File directory = cw.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         return new File(directory, SCRATCH_FILE_NAME);
+    }
+
+    /**
+     * Saves image from the Android Media Store to the internal scratch file.
+
+     * @param imageUri Location of image in Android Media Store.
+     */
+    public void initFromMediaStore(Uri imageUri) {
+        Bitmap bitmap = loadBitmapFromMediaStore(imageUri, context);
+        saveBitmapToScratchFile(bitmap);
     }
 
     /**
@@ -108,38 +149,6 @@ public class MosaicScratchFile {
     }
 
     /**
-     * Adds the current scratch file to the Android Media Store, where it can be seen by other apps.
-     * TODO: Is there some way to get back the Uri of the newly added image?
-     */
-    public void addScratchFileToAndroidMediaStore(File imageFileToAdd, IAddedToMediaStore callback) {
-        MediaScannerConnection.MediaScannerConnectionClient client =
-                new MosaicMediaScannerConnectionClient(imageFileToAdd, callback);
-    }
-
-    public File copyScratchFileToPublicDirectory() {
-        File externalDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-
-        Log.d(TAG, "externalDir=" + externalDir);
-
-        // Randomly generate a filename using the current date/time/seconds to guarantee uniqueness.
-        DateFormat dateFormat = new DateFormat();
-        CharSequence fileName = "mosaic_" + dateFormat.format("yyyy_MM_dd_hh_mm_ss", new Date()) + ".jpg";
-        File externalFile = new File(externalDir, (String) fileName);
-
-        Log.d(TAG, "scratchFile=" + scratchFile.getAbsolutePath());
-        Log.d(TAG, "externalFile=" + externalFile.getAbsolutePath());
-
-        try {
-            FileUtils.copyFile(scratchFile, externalFile);
-            Log.i(TAG, String.format("Copied scratch file to %s OK", scratchFile.getAbsolutePath()));
-        } catch (IOException iox) {
-            Log.e(TAG, "Failed to copy scratch file to public", iox);
-        }
-
-        return externalFile;
-    }
-
-    /**
      * Makes the content of this scratch file equal to the given bitmap.
      *
      * @param bitmap Bitmap that will become the new contents of this scratch file.
@@ -148,8 +157,7 @@ public class MosaicScratchFile {
         FileOutputStream outputStream = null;
         try {
             outputStream = new FileOutputStream(scratchFile);
-            // "100" = "100 percent" quality
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+            bitmap.compress(OUTPUT_IMAGE_COMPRESS_FORMAT, OUTPUT_IMAGE_QUALITY_PERCENT, outputStream);
         } catch (FileNotFoundException fnfe) {
             Log.e(TAG, "Failed to write bitmap to scratch file", fnfe);
         } finally {
@@ -161,16 +169,25 @@ public class MosaicScratchFile {
         }
     }
 
+    /**
+     * Connects to the Android Media Scanner when #addScratchFileToAndroidMediaStore is called and listens
+     * for asynchronous completion of the addition. This way the user can be notified when we are *sure* the
+     * image has been added.
+     */
     private class MosaicMediaScannerConnectionClient implements MediaScannerConnection.MediaScannerConnectionClient {
-        private final MediaScannerConnection msc;
+        private final MediaScannerConnection mediaScannerConnection;
         private final File imageFileToAdd;
         private final IAddedToMediaStore addedCallback;
 
+        /**
+         * @param imageFileToAdd Public copy of the scratch file
+         * @param addedCallback Notified asynch when the addition is finished
+         */
         public MosaicMediaScannerConnectionClient(File imageFileToAdd, IAddedToMediaStore addedCallback) {
             this.imageFileToAdd = imageFileToAdd;
             this.addedCallback = addedCallback;
-            msc = new MediaScannerConnection(context, this);
-            msc.connect();
+            mediaScannerConnection = new MediaScannerConnection(context, this);
+            mediaScannerConnection.connect();
         }
 
         @Override
@@ -178,19 +195,16 @@ public class MosaicScratchFile {
             String mimeType = null;
             String filePath = imageFileToAdd.getAbsolutePath();
             Log.d(TAG, "Scanning file at " + filePath);
-            msc.scanFile(filePath, mimeType);
+            mediaScannerConnection.scanFile(filePath, mimeType);
         }
 
         public void onScanCompleted(String s, Uri uri) {
-            msc.disconnect();
+            mediaScannerConnection.disconnect();
             Log.d(TAG, "Notified of scan completion");
             Log.d(TAG, "URI in Media Store: " + uri);
             Log.d(TAG, "Path of file referenced by Media Store: " + s);
 
             addedCallback.added(s, uri);
-
-
-
         }
     }
 }

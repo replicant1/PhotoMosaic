@@ -8,6 +8,9 @@ import android.net.Uri;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
+import static bailey.rod.photomosaic.Constants.TILE_HEIGHT_PX;
+import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
+
 /**
  * A service that applies a "Mosaic" effect to a given image file. The image file is specified with a
  * URI to the Android Media Store. The service broadcasts three types of Intents as it proceeds
@@ -40,9 +43,6 @@ public class MosaicService extends IntentService {
     public static final String EXTRA_PROGRESS =
             "bailey.rod.photomosaic.EXTRA_PROGRESS";
 
-    private static final int TILE_WIDTH_PX = 32;
-
-    private static final int TILE_HEIGHT_PX = 32;
 
     public MosaicService() {
         super("Photo Mosaic");
@@ -62,9 +62,6 @@ public class MosaicService extends IntentService {
         MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(this);
         mosaicScratchFile.initFromMediaStore(imageUri);
         Bitmap bitmap = mosaicScratchFile.loadMutableBitmapFromScratchFile();
-
-        int TILE_WIDTH_PX = 32;
-        int TILE_HEIGHT_PX = 32;
 
         int pixel;
         int redComponent;
