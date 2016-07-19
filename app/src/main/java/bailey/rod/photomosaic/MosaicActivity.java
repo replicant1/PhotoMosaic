@@ -218,6 +218,7 @@ public class MosaicActivity extends AppCompatActivity {
 
                         @Override
                         public void added(final String pathToUnderlyingImageFile, final Uri mediaStoreUri) {
+                            // TODO: Perhaps raise a Toast to reinforce what just happenned
                             Handler h = new Handler(MosaicActivity.this.getMainLooper());
                             Runnable runnable = new Runnable() {
 
