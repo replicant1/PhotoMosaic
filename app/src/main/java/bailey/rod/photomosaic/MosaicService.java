@@ -28,16 +28,20 @@ import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
  * <li> The image is notionally divided into tiles
  * <li> For each tile 'T':
  * <li> - The average color 'C' of the image's pixels within T is calculated
- * <li> - An external service is contacted that takes C and returns a tile image 'M'
- * <li> - T's area in the mosaic is replaced with image 'Mf'
+ * <li> - An external service is contacted that takes C and returns a mosaic tile image 'M'
+ * <li> - T's area in the mosaic is replaced with image 'M'
  */
 public class MosaicService extends IntentService {
 
     private static final String TAG = MosaicService.class.getSimpleName();
 
-    // Defines a custom Intent action
-    public static final String BROADCAST_ACTION =
-            "bailey.rod.photomosaic.BROADCAST";
+    // Defines a custom Intent action for Intent broadcast every time the processing advances by another percent
+    public static final String MOSAIC_CREATION_PROGRESSED =
+            "bailey.rod.photomosaic.MOSAIC_CREATION_PROGRESSED";
+
+    // Custom Intent action broadcase whenever mosaic creation has finished and the completed mosaic
+    // image is now in the private scratch file.
+    public static final String MOSAIC_CREATION_FINISHED = "bailey.rod.photomosaic.MOSAIC_CREATION_FINISHED";
 
     // Defines the key for the status "extra" in an Intent
     public static final String EXTRA_PROGRESS =
@@ -56,6 +60,8 @@ public class MosaicService extends IntentService {
 
         Uri imageUri = Uri.parse(intent.getDataString());
         bigLoop(imageUri);
+
+        broadcastMosaicCreationFinished();
     }
 
     private void bigLoop(Uri imageUri) {
@@ -118,7 +124,7 @@ public class MosaicService extends IntentService {
 
                 numTilesProcessed++;
 
-                // Contact the server to get a PNG of a tile with the average color
+                // TODO Contact the server to get a PNG of a tile with the average color
 
                 // Broadcast a new result - another tile has been averaged.
                 // Include the tile just returned form the server in the content of the
@@ -137,8 +143,13 @@ public class MosaicService extends IntentService {
     }
 
     private void broadcastProgressUpdate(int percentProgress) {
-        Intent broadcastIntent = new Intent(BROADCAST_ACTION);
+        Intent broadcastIntent = new Intent(MOSAIC_CREATION_PROGRESSED);
         broadcastIntent.putExtra(EXTRA_PROGRESS, percentProgress);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
+    }
+
+    private void broadcastMosaicCreationFinished() {
+        Intent broadcastIntent = new Intent(MOSAIC_CREATION_FINISHED);
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
     }
 

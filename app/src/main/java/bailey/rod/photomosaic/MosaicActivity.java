@@ -17,7 +17,6 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,9 +32,15 @@ public class MosaicActivity extends AppCompatActivity {
 
     private static final String TAG = MosaicActivity.class.getSimpleName();
 
-    private final IntentFilter intentFilter = new IntentFilter(MosaicService.BROADCAST_ACTION);
+    private final IntentFilter mosaicProgressedIntentFilter =
+            new IntentFilter(MosaicService.MOSAIC_CREATION_PROGRESSED);
 
-    private final MosaicBroadcastReceiver mosaicBroadcastReceiver = new MosaicBroadcastReceiver();
+    private final BroadcastReceiver mosaicProgressReceiver = new MosaicProgressBroadcastReceiver();
+
+    private final IntentFilter mosaicFinishedIntentFilter =
+            new IntentFilter(MosaicService.MOSAIC_CREATION_FINISHED);
+
+    private final BroadcastReceiver mosaicFinishedReceiver = new MosaicFinishedBroadcastReceiver();
 
     private Button allPurposeButton;
 
@@ -107,13 +112,15 @@ public class MosaicActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicBroadcastReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicProgressReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicFinishedReceiver);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(mosaicBroadcastReceiver, intentFilter);
+        LocalBroadcastManager.getInstance(this).registerReceiver(mosaicProgressReceiver, mosaicProgressedIntentFilter);
+        LocalBroadcastManager.getInstance(this).registerReceiver(mosaicFinishedReceiver, mosaicFinishedIntentFilter);
     }
 
     /**
@@ -132,7 +139,7 @@ public class MosaicActivity extends AppCompatActivity {
      *
      * @see MosaicService
      */
-    private class MosaicBroadcastReceiver extends BroadcastReceiver {
+    private class MosaicProgressBroadcastReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -143,15 +150,22 @@ public class MosaicActivity extends AppCompatActivity {
             String progressBarMsgFormat = getResources().getString(R.string.progress_bar_percent_msg);
             progressMsg.setText(String.format(progressBarMsgFormat, percentComplete));
 
-            if (percentComplete == 100) {
-                // TODO: What if I receive 100% notification multiple times?
-                // TODO: Probably need to alter MosaicService to send a distinct type of message upon finfish.
-                MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
-                imageView.setImageBitmap(mosaicScratchFile.loadMutableBitmapFromScratchFile());
 
-                mode = OperatingMode.READY_TO_SEND_TO_MEDIA_STORE;
-                adjustUIPerMode();
-            }
+        }
+    }
+
+    /**
+     * Listens for a "finished" intent from the MosaicService, which indicates the scratch file now
+     * contains the completed mosaic.
+     */
+    private class MosaicFinishedBroadcastReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
+            imageView.setImageBitmap(mosaicScratchFile.loadMutableBitmapFromScratchFile());
+
+            mode = OperatingMode.READY_TO_SEND_TO_MEDIA_STORE;
+            adjustUIPerMode();
         }
     }
 
