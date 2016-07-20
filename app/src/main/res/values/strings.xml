@@ -5,5 +5,5 @@
     <string name="button_label_cancel">Cancel</string>
     <string name="button_label_send_to">Send Mosaic to Another App</string>
     <string name="progress_bar_percent_msg">Percent complete: %1$d</string>
-    <string name="help_text"><b>Share</b> any image on this device from another app. Select <b>Photo Mosaic</b> from the list of available apps.</string>
+    <string name="help_text">To create a mosaic version of an image, navigate to that image using some other app. Then press the <b>Share</b> icon and select <b>Photo Mosaic</b>.</string>
 </resources>
