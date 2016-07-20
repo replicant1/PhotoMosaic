@@ -3,11 +3,16 @@ package bailey.rod.photomosaic;
 import android.app.IntentService;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -100,8 +105,10 @@ public class MosaicService extends IntentService {
 
         // Process mosaic tiles in row-major order i.e. same as western reading order.
         for (int tileTopY = 0; (tileTopY < bitmap.getHeight()) && !abortRequested; tileTopY += TILE_HEIGHT_PX) {
-            ExecutorService rowExecutorService = Executors.newFixedThreadPool(10);
-            List<MosaicTileCreator> creatorsForThisRow = new LinkedList<MosaicTileCreator>();
+            ExecutorService rowExecutorService = Executors.newFixedThreadPool(Constants.MAX_THREAD_POOL_SIZE);
+
+            List<Callable<MosaicTileCreatorResult>> creatorsForThisRow =
+                    new LinkedList<Callable<MosaicTileCreatorResult>>();
 
             for (int tileLeftX = 0; (tileLeftX < bitmap.getWidth()) && !abortRequested; tileLeftX += TILE_WIDTH_PX) {
 
@@ -146,7 +153,13 @@ public class MosaicService extends IntentService {
                 request.tileWidth = numXPixelsInTile;
                 request.tileHeight = numYPixelsInTile;
 
-                creatorsForThisRow.add(new MosaicTileCreator(request));
+                // Use the Test or Server versions of the MosaicTileCreator, depending on whether we are
+                // in testing mode or not according to Constants.TILE_STRATEGY. This is just a testing
+                // convenience.
+                // TODO: Use dependency injection instead
+                creatorsForThisRow.add(Constants.TILE_STRATEGY == MosaicTileImageStrategy.SERVER ? //
+                                               new ServerMosaicTileCreator(request) : //
+                                               new TestMosaicTileCreator(request)); //
 
 
                 // Include the request just returned form the server in the content of the
@@ -305,12 +318,14 @@ public class MosaicService extends IntentService {
 
     /**
      * Executable task that when called, serves the given MosaicTileCreatorRequest by producing
-     * a MosaicTIleCreatorResult which contains the mosaic tile image.
+     * a result containing the tile image. The tile image is just a solid fill of the average color
+     * for the tile pre-mosaic. Because it is done locally without any contact with an external server,
+     * this can be handy for testing.
      */
-    public class MosaicTileCreator implements Callable<MosaicTileCreatorResult> {
+    public class TestMosaicTileCreator implements Callable<MosaicTileCreatorResult> {
         private final MosaicTileCreatorRequest request;
 
-        public MosaicTileCreator(MosaicTileCreatorRequest tile) {
+        public TestMosaicTileCreator(MosaicTileCreatorRequest tile) {
             this.request = tile;
         }
 
@@ -323,6 +338,53 @@ public class MosaicService extends IntentService {
                                      request.tileHeight));
             Bitmap bitmap = Bitmap.createBitmap(request.tileWidth, request.tileHeight, Bitmap.Config.RGB_565);
             bitmap.eraseColor(request.averageColor);
+
+            MosaicTileCreatorResult result = new MosaicTileCreatorResult();
+            result.topLeftX = request.topLeftX;
+            result.topLeftY = request.topLeftY;
+            result.bitmap = bitmap;
+
+            return result;
+        }
+    }
+
+    public class ServerMosaicTileCreator implements Callable<MosaicTileCreatorResult> {
+        private final MosaicTileCreatorRequest request;
+
+        public ServerMosaicTileCreator(MosaicTileCreatorRequest tile) {
+            this.request = tile;
+        }
+
+        @Override
+        public MosaicTileCreatorResult call() throws Exception {
+            String serverUrl = String.format(Constants.MOSAIC_SERVER_URL, request.tileWidth, request.tileHeight,
+                                             Utils.packagedColorIntToRGBHexString(request.averageColor));
+
+            Log.d(TAG, String.format("Fetching bitmap with top left [%d, %d] from URL %s",
+                                     request.topLeftX,
+                                     request.topLeftY,
+                                     serverUrl));
+
+            InputStream inputStream = null;
+            Bitmap bitmap = null;
+
+            try {
+                URL url = new URL(serverUrl);
+                URLConnection connection = url.openConnection();
+                inputStream = connection.getInputStream();
+                bitmap = BitmapFactory.decodeStream(inputStream);
+
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to load mosaic tile from server", ex);
+            } finally {
+                if (inputStream != null) {
+                    try {
+                        inputStream.close();
+                    } catch (IOException iox) {
+                        Log.e(TAG, "Failed to close input stream from mosaic tile server", iox);
+                    }
+                }
+            }
 
             MosaicTileCreatorResult result = new MosaicTileCreatorResult();
             result.topLeftX = request.topLeftX;

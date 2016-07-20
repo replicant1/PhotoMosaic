@@ -3,11 +3,11 @@ package bailey.rod.photomosaic;
 import android.graphics.Bitmap;
 
 /**
- * Collection of constants that might need tweeking over time.
- *
+ * Collection of constants that might need modifying over time.
+ * <p/>
  * TODO Might later migrate to an external assets/config.properties file.
  */
-public class Constants {
+public abstract class Constants {
 
     /**
      * Pixel width of mosaic tiles
@@ -57,14 +57,28 @@ public class Constants {
      */
     public static final int OUTPUT_IMAGE_QUALITY_PERCENT = 100;
 
+    /** Current mosaic tile creation strategy */
+    public static final MosaicTileImageStrategy TILE_STRATEGY = MosaicTileImageStrategy.SERVER;
+
+    /**
+     * URL from which mosaic tiles can be retieved if TILE_STRATEGY is SERVER.
+     * The following substitutions are made dynamically:
+     * Arg 1 (%d) - pixel width of the desired mosaic tile image
+     * Arg 2 (%d) - pixel height of the desired mosaic tile image
+     * Arg 3 (%s) - 6 character hex code of the color of moasic tile required
+     * The port of the server is always 8765. To access the server from the android emulator,
+     * change the IP to 10.0.0.2
+     */
+    public static final String MOSAIC_SERVER_URL = "http://192.168.1.4:8765/color/%d/%d/%s";
+
     /**
      * Possible ways of getting the image for a mosaic tile
      */
     public enum MosaicTileImageStrategy {
-        CREATE_TILE_IMAGE_FROM_AVERAGE_COLOR, // Fill tile programmatically with average color
-        FETCH_TILE_IMAGE_FROM_SERVER; // Fetch from external tile server
+        TEST, // Fill tile programmatically with average color - good for testing
+        SERVER; // Fetch tile image from external tile server
     }
 
-    public static final MosaicTileImageStrategy TILE_STRATEGY = MosaicTileImageStrategy
-            .CREATE_TILE_IMAGE_FROM_AVERAGE_COLOR;
+    // Max concurrent threads when finding mosaic tiles for a given row
+    public static final int MAX_THREAD_POOL_SIZE = 10;
 }
