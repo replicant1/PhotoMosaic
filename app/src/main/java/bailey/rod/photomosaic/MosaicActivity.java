@@ -23,8 +23,11 @@ import java.io.IOException;
 
 
 /**
- * Presents the image to be mosaic'd with a allPurposeButton that takes you through to the next step in the mosaic'ing
- * process, or cancels the current step. When mosaic'ing is in progress, a progress bar appears as well.
+ * Presents the image to be mosaic'd with an allPurposeButton that takes you through to the next step in the mosaic'ing
+ * process, or cancels the current step. When mosaic'ing is in progress, a progress bar appears as well as pressing the
+ * allPurposeButton will Cancel the mosaic'ing process in progress. At the end of processing, pressing the button
+ * enables the user to Share To the mosaic with other apps. The mosaic image is always stored in the public "Pictures"
+ * directory and is registered in the Android Media Store.
  *
  * @see MosaicService
  */
@@ -41,6 +44,11 @@ public class MosaicActivity extends AppCompatActivity {
             new IntentFilter(MosaicService.MOSAIC_CREATION_FINISHED);
 
     private final BroadcastReceiver mosaicFinishedReceiver = new MosaicFinishedBroadcastReceiver();
+
+    private final IntentFilter mosaicRowFinishedIntentFilter =
+            new IntentFilter(MosaicService.MOSAIC_CREATION_ROW_FINISHED);
+
+    private final BroadcastReceiver mosaicRowFinishedReceiver = new MosaicRowFinishedBroadcastReceiver();
 
     private Button allPurposeButton;
 
@@ -96,8 +104,8 @@ public class MosaicActivity extends AppCompatActivity {
             case MOSIAC_PROCESSING_COMPLETED:
                 helpTextView.setVisibility(View.GONE);
                 imageView.setVisibility(View.VISIBLE);
-                progressBar.setVisibility(View.INVISIBLE);
-                progressMsg.setVisibility(View.INVISIBLE);
+                progressBar.setVisibility(View.GONE);
+                progressMsg.setVisibility(View.GONE);
                 allPurposeButton.setVisibility(View.VISIBLE);
                 allPurposeButton.setText(R.string.button_label_send_to);
                 break;
@@ -156,6 +164,7 @@ public class MosaicActivity extends AppCompatActivity {
         super.onPause();
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicProgressReceiver);
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicFinishedReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mosaicRowFinishedReceiver);
     }
 
     @Override
@@ -163,6 +172,7 @@ public class MosaicActivity extends AppCompatActivity {
         super.onResume();
         LocalBroadcastManager.getInstance(this).registerReceiver(mosaicProgressReceiver, mosaicProgressedIntentFilter);
         LocalBroadcastManager.getInstance(this).registerReceiver(mosaicFinishedReceiver, mosaicFinishedIntentFilter);
+        LocalBroadcastManager.getInstance(this).registerReceiver(mosaicRowFinishedReceiver, mosaicRowFinishedIntentFilter);
     }
 
     /**
@@ -190,8 +200,26 @@ public class MosaicActivity extends AppCompatActivity {
             int percentComplete = intent.getIntExtra(MosaicService.EXTRA_PROGRESS, 0);
 
             progressBar.setProgress(percentComplete);
-            String progressBarMsgFormat = getResources().getString(R.string.progress_bar_percent_msg);
+            String progressBarMsgFormat = getString(R.string.progress_bar_percent_msg);
             progressMsg.setText(String.format(progressBarMsgFormat, percentComplete));
+        }
+    }
+
+    /**
+     * Listens for a "row finished" intent from the MosaicService, which indicates the scratch file
+     * now has another complete row of tiles finished.
+     */
+    private class MosaicRowFinishedBroadcastReceiver extends BroadcastReceiver {
+
+        private final Handler handler = new Handler();
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.d(TAG, "*** Received ROW FINISHED ***");
+
+            MosaicScratchFile mosaicScratchFile = new MosaicScratchFile(MosaicActivity.this);
+            Bitmap bitmap = mosaicScratchFile.loadMutableBitmapFromScratchFile();
+            imageView.setImageBitmap(bitmap);
         }
     }
 

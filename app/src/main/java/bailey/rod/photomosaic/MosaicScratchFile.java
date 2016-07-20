@@ -44,7 +44,7 @@ public class MosaicScratchFile {
     /**
      * Constructs a MosaicScrachFile suitable for use as a working file for creating a mosaic.
      *
-     * @param context  Application context.
+     * @param context Application context.
      */
     public MosaicScratchFile(Context context) {
         scratchFile = getWorkingFilePath(context);
@@ -105,7 +105,7 @@ public class MosaicScratchFile {
 
     /**
      * Saves image from the Android Media Store to the internal scratch file.
-
+     *
      * @param imageUri Location of image in Android Media Store.
      */
     public void initFromMediaStore(Uri imageUri) {
@@ -138,12 +138,23 @@ public class MosaicScratchFile {
      */
     public Bitmap loadMutableBitmapFromScratchFile() {
         Bitmap result = null;
+        FileInputStream fileInputStream = null;
+
         try {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inMutable = true;
-            result = BitmapFactory.decodeStream(new FileInputStream(scratchFile), null, options);
-        } catch (FileNotFoundException fnfe) {
-            Log.e(TAG, "Failed to load bitmap from scratch file", fnfe);
+            fileInputStream = new FileInputStream(scratchFile);
+            result = BitmapFactory.decodeStream(fileInputStream, null, options);
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to load bitmap from scratch file", iox);
+        } finally {
+            try {
+                if (fileInputStream != null) {
+                    fileInputStream.close();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to close filoe input stream when reading scratch file");
+            }
         }
         return result;
     }
@@ -154,15 +165,18 @@ public class MosaicScratchFile {
      * @param bitmap Bitmap that will become the new contents of this scratch file.
      */
     public void saveBitmapToScratchFile(Bitmap bitmap) {
-        FileOutputStream outputStream = null;
+        FileOutputStream fileOutputStream = null;
+
         try {
-            outputStream = new FileOutputStream(scratchFile);
-            bitmap.compress(OUTPUT_IMAGE_COMPRESS_FORMAT, OUTPUT_IMAGE_QUALITY_PERCENT, outputStream);
-        } catch (FileNotFoundException fnfe) {
-            Log.e(TAG, "Failed to write bitmap to scratch file", fnfe);
+            fileOutputStream = new FileOutputStream(scratchFile);
+            bitmap.compress(OUTPUT_IMAGE_COMPRESS_FORMAT, OUTPUT_IMAGE_QUALITY_PERCENT, fileOutputStream);
+        } catch (IOException iox) {
+            Log.e(TAG, "Failed to write bitmap to scratch file", iox);
         } finally {
             try {
-                outputStream.close();
+                if (fileOutputStream != null) {
+                    fileOutputStream.close();
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to close output stream when saving bitmap to scratch file", e);
             }
@@ -176,12 +190,14 @@ public class MosaicScratchFile {
      */
     private class MosaicMediaScannerConnectionClient implements MediaScannerConnection.MediaScannerConnectionClient {
         private final MediaScannerConnection mediaScannerConnection;
+
         private final File imageFileToAdd;
+
         private final IAddedToMediaStore addedCallback;
 
         /**
          * @param imageFileToAdd Public copy of the scratch file
-         * @param addedCallback Notified asynch when the addition is finished
+         * @param addedCallback  Notified asynch when the addition is finished
          */
         public MosaicMediaScannerConnectionClient(File imageFileToAdd, IAddedToMediaStore addedCallback) {
             this.imageFileToAdd = imageFileToAdd;

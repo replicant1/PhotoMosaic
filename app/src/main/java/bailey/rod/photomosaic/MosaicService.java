@@ -5,10 +5,16 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
-import android.os.Binder;
-import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static bailey.rod.photomosaic.Constants.TILE_HEIGHT_PX;
 import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
@@ -17,20 +23,20 @@ import static bailey.rod.photomosaic.Constants.TILE_WIDTH_PX;
  * A service that applies a "Mosaic" effect to a given image file. The image file is specified with a
  * URI to the Android Media Store. The service broadcasts three types of Intents as it proceeds
  * through the mosaicing process - progress, finished and error.
- * <p>
+ * <p/>
  * To trigger the service, broadcast an Intent with the sole data of the URI to the image file
  * to be processed. From inside an Activity, do this:
  * <code>
- * <p>
+ * <p/>
  * Intent intent = new Intent(this, MosaicService.class);
  * intent.setData(imageUri);
  * startService(intent);
  * </code>
  * Each time such an Intent is received, the following occurs:
  * <li> The image is notionally divided into tiles
- * <li> For each tile 'T':
+ * <li> For each request 'T':
  * <li> - The average color 'C' of the image's pixels within T is calculated
- * <li> - An external service is contacted that takes C and returns a mosaic tile image 'M'
+ * <li> - An external service is contacted that takes C and returns a mosaic request image 'M'
  * <li> - T's area in the mosaic is replaced with image 'M'
  */
 public class MosaicService extends IntentService {
@@ -39,9 +45,13 @@ public class MosaicService extends IntentService {
     public static final String MOSAIC_CREATION_PROGRESSED =
             "bailey.rod.photomosaic.MOSAIC_CREATION_PROGRESSED";
 
-    // Custom Intent action broadcase whenever mosaic creation has finished and the completed mosaic
+    // Custom Intent action broadcast whenever mosaic creation has finished and the completed mosaic
     // image is now in the private scratch file.
     public static final String MOSAIC_CREATION_FINISHED = "bailey.rod.photomosaic.MOSAIC_CREATION_FINISHED";
+
+    // Custom Intent broadcast whenever the mosaic'ing process finishes the last request in a given row.
+    // The process proceeds one row at a time, from top to bottom of the image.
+    public static final String MOSAIC_CREATION_ROW_FINISHED = "bailey.rod.photomosaic.MOSAIC_CREATION_ROW_FINISHED";
 
     // Defines the key for the status "extra" in an Intent
     public static final String EXTRA_PROGRESS =
@@ -73,7 +83,8 @@ public class MosaicService extends IntentService {
         int redComponent;
         int blueComponent;
         int greenComponent;
-        int numPixelsInTile;
+        int numXPixelsInTile;
+        int numYPixelsInTile;
         int averageRed;
         int averageBlue;
         int averageGreen;
@@ -90,26 +101,33 @@ public class MosaicService extends IntentService {
 
         // Process mosaic tiles in row-major order i.e. same as western reading order.
         for (int tileTopY = 0; (tileTopY < bitmap.getHeight()) && !abortRequested; tileTopY += TILE_HEIGHT_PX) {
+            ExecutorService rowExecutorService = Executors.newFixedThreadPool(10);
+            List<MosaicTileCreator> creatorsForThisRow = new LinkedList<MosaicTileCreator>();
+
             for (int tileLeftX = 0; (tileLeftX < bitmap.getWidth()) && !abortRequested; tileLeftX += TILE_WIDTH_PX) {
 
-                // Find the average colour for the pixels in the tile by finding the average red, green and blue
+                // Find the average colour for the pixels in the request by finding the average red, green and blue
                 // component values of each pixel individually.
                 redComponent = 0;
                 blueComponent = 0;
                 greenComponent = 0;
 
-                numPixelsInTile = 0;
+                numXPixelsInTile = 0;
+                numYPixelsInTile = 0;
 
                 // TODO: Investigate if bitmap.getpixels() is better than bitmap.getPixel() in a loop.
                 for (int pixelX = tileLeftX; (pixelX < (tileLeftX + TILE_WIDTH_PX)) && (pixelX < bitmap.getWidth());
                      pixelX++) {
+                    numXPixelsInTile++;
+                    numYPixelsInTile = 0;
+
                     for (int pixelY = tileTopY; (pixelY < (tileTopY + TILE_HEIGHT_PX)) && (pixelY < bitmap.getHeight());
                          pixelY++) {
+                        numYPixelsInTile++;
 
-                        // Find the average color of the tile whose top left corner
+                        // Find the average color of the request whose top left corner
                         // is at  [x,y]
                         pixel = bitmap.getPixel(pixelX, pixelY);
-                        numPixelsInTile++;
 
                         redComponent += Color.red(pixel);
                         blueComponent += Color.blue(pixel);
@@ -117,25 +135,26 @@ public class MosaicService extends IntentService {
                     }
                 }
 
-                averageRed = redComponent / numPixelsInTile;
-                averageBlue = blueComponent / numPixelsInTile;
-                averageGreen = greenComponent / numPixelsInTile;
+                averageRed = redComponent / (numXPixelsInTile * numYPixelsInTile);
+                averageBlue = blueComponent / (numXPixelsInTile * numYPixelsInTile);
+                averageGreen = greenComponent / (numXPixelsInTile * numYPixelsInTile);
                 averageColor = Color.rgb(averageRed, averageGreen, averageBlue);
 
-                // Fill the tile with its average color.
-                for (int drawX = tileLeftX; (drawX < (tileLeftX + TILE_WIDTH_PX)) && (drawX < bitmap.getWidth()); drawX++) {
-                    for (int drawY = tileTopY; (drawY < (tileTopY + TILE_HEIGHT_PX)) && (drawY < bitmap.getHeight());
-                         drawY++) {
-                        bitmap.setPixel(drawX, drawY, averageColor);
-                    }
-                }
+                MosaicTileCreatorRequest request = new MosaicTileCreatorRequest();
+                request.topLeftX = tileLeftX;
+                request.topLeftY = tileTopY;
+                request.averageColor = averageColor;
+                request.tileWidth = numXPixelsInTile;
+                request.tileHeight = numYPixelsInTile;
 
-                numTilesProcessed++;
+                creatorsForThisRow.add(new MosaicTileCreator(request));
 
-                // TODO Contact the server to get a PNG of a tile with the average color
 
-                // Broadcast a new result - another tile has been averaged.
-                // Include the tile just returned form the server in the content of the
+                // TODO Contact the server to get a PNG of a request with the average color
+
+
+                // Broadcast a new result - another request has been averaged.
+                // Include the request just returned form the server in the content of the
                 // broadcast message.
                 int percentProgress = numTilesProcessed * 100 / totalTilesToProcess;
                 Log.d(TAG, String.format("Percent complete: %d, Tile [%d, %d] has average color of (R:%d G:%d B:%d)",
@@ -144,28 +163,134 @@ public class MosaicService extends IntentService {
                                          averageGreen,
                                          averageBlue));
 
-                // TODO: Maybe just save the tile we just changed, rather than the entire bitmap, most of which
-                // hasn't changed.
-                mosaicScratchFile.saveBitmapToScratchFile(bitmap);
-                broadcastProgressUpdate(percentProgress);
+                // TODO: Maybe just save the request we just changed, rather than the entire bitmap, most of which
+                // TODO: hasn't changed.
 
+//                mosaicScratchFile.saveBitmapToScratchFile(bitmap);
+//                broadcastProgressUpdate(percentProgress);
 
-                // TODO At end of row, broadcast MOSAIC_ROW_PROCESSED intent
             } // for x
+
+            // Before moving onto the next row, update the bitmap with the result of all of the
+            // mosaic tiles for the current row.
+
+            try {
+                Log.d(TAG, "About to use executor service to invokeAll on collection of " + creatorsForThisRow.size());
+                List<Future<MosaicTileCreatorResult>> futures = rowExecutorService.invokeAll(creatorsForThisRow);
+                Log.d(TAG, "Back from invokeAll with #futures=" + futures.size());
+
+                // Should do this from the individual creators
+                numTilesProcessed += futures.size();
+
+                for (Future<MosaicTileCreatorResult> future : futures) {
+
+
+                    // Get the calculated mosaic request pixels out of the result
+                    MosaicTileCreatorResult result = future.get();
+
+                    int bitmapWidth = result.bitmap.getWidth();
+                    int bitmapHeight = result.bitmap.getHeight();
+                    int[] pixels = new int[bitmapHeight * bitmapWidth];
+
+                    result.bitmap.getPixels(pixels, // data out
+                                            0, // offset
+                                            bitmapWidth, // stride
+                                            0, // x
+                                            0, // y
+                                            bitmapWidth, // width
+                                            bitmapHeight);// height
+
+                    // Copy the mosiac tiles pixels into the scratch file
+                    bitmap.setPixels(pixels, // data in
+                                     0, // offset
+                                     bitmapWidth, // stride
+                                     result.topLeftX, // x
+                                     result.topLeftY, // y
+                                     bitmapWidth, // width
+                                     bitmapHeight); // height
+                }
+
+                mosaicScratchFile.saveBitmapToScratchFile(bitmap);
+                broadcastMosaicCreationRowFinished();
+
+            } catch (InterruptedException iex) {
+                Log.e(TAG, "Error invoking all creators for row", iex);
+            } catch (ExecutionException eex) {
+                Log.e(TAG, "Error invoking all creators for row", eex);
+            }
         } // for y
+    }
+
+    public class MosaicTileCreatorRequest {
+        public int topLeftX;
+
+        public int topLeftY;
+
+        public int averageColor;
+
+        public int tileWidth;
+
+        public int tileHeight;
+
+    }
+
+    public class MosaicTileCreatorResult {
+        public int topLeftX;
+
+        public int topLeftY;
+
+        public Bitmap bitmap;
+    }
+
+    public class MosaicTileCreator implements Callable<MosaicTileCreatorResult> {
+        private final MosaicTileCreatorRequest request;
+
+        public MosaicTileCreator(MosaicTileCreatorRequest tile) {
+            this.request = tile;
+        }
+
+        @Override
+        public MosaicTileCreatorResult call() throws Exception {
+            Log.d(TAG, String.format("Creating bitmap with top left [%d, %d] and size %d x %d",
+                                     request.topLeftX,
+                                     request.topLeftY,
+                                     request.tileWidth,
+                                     request.tileHeight));
+            Bitmap bitmap = Bitmap.createBitmap(request.tileWidth, request.tileHeight, Bitmap.Config.RGB_565);
+            bitmap.eraseColor(request.averageColor);
+
+            MosaicTileCreatorResult result = new MosaicTileCreatorResult();
+            result.topLeftX = request.topLeftX;
+            result.topLeftY = request.topLeftY;
+            result.bitmap = bitmap;
+
+            return result;
+        }
+
     }
 
     /**
      * Broadcasts to MosaicActivity that this service has finished the mosaic creation process
      */
     private void broadcastMosaicCreationFinished() {
+        Log.d(TAG, "Broadcasting MOSAIC FINISHED");
         Intent broadcastIntent = new Intent(MOSAIC_CREATION_FINISHED);
         LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
     }
 
     /**
+     * Broadcasts to MosaicActivity this service has finished mosaic process for another row of tiles in the image.
+     * Some clients will use this to perform screen refreshes of one row at a time.
+     */
+    private void broadcastMosaicCreationRowFinished() {
+        Log.d(TAG, "Broadcasting ROW FINISHED");
+        Intent broadcastIntent = new Intent(MOSAIC_CREATION_ROW_FINISHED);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent);
+    }
+
+    /**
      * Broadcasts to MosaicActivity that this service has made further progress in creating the mosaic, by
-     * processing another tile.
+     * processing another request.
      *
      * @param percentProgress The percentage progress in [0,100]
      */
