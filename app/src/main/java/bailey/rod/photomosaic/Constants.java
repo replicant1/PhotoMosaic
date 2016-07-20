@@ -56,4 +56,15 @@ public class Constants {
      * Quality of output image as a percentage.
      */
     public static final int OUTPUT_IMAGE_QUALITY_PERCENT = 100;
+
+    /**
+     * Possible ways of getting the image for a mosaic tile
+     */
+    public enum MosaicTileImageStrategy {
+        CREATE_TILE_IMAGE_FROM_AVERAGE_COLOR, // Fill tile programmatically with average color
+        FETCH_TILE_IMAGE_FROM_SERVER; // Fetch from external tile server
+    }
+
+    public static final MosaicTileImageStrategy TILE_STRATEGY = MosaicTileImageStrategy
+            .CREATE_TILE_IMAGE_FROM_AVERAGE_COLOR;
 }
