@@ -1,9 +1,9 @@
-#Photo Mosaic Android App
+# Photo Mosaic Android App
 
 Rod Bailey
 20 July 2016
 
-#Summary
+# Summary
 
 This is an Android application created as a technical exercise for Canva.
 
@@ -16,7 +16,7 @@ Switch between these two options by changing the value of `Constants.TILE_STRATE
 
 The root directory of this project contains a file `example mosaics.zip` which contains samples of the mosaics produced in both modes of operation.
 
-#Design
+# Design
 
 The app consists mainly of an Activity and a Service. The Activity handles the UI work and the long-running operations associated with constructing the Mosaic image are delegated to the Service. The service does the compute-heavy operations on background threads, leaving the main thread free to keep the UI running smoothly.
 
@@ -26,11 +26,11 @@ Once the mosaic equivalent of the given image has been generated, it is stored i
 
 Finally, the user can elect to *Share* the mosaic image themselves to some other app on the device.
 
-#Concurrency
+# Concurrency
 
 An essential element of the `MosaicService` design is the user of parallelism to speed up the mosaic'ing process. Note the use of the `ExecutorService` to take advantage of the fact that the contents of mosaic tile images can be calculated independently.
 
-#TO DO
+# TO DO
 
 Being a time-constrained exercise, there are of course a few limitations that are obvious and should be corrected:
 
